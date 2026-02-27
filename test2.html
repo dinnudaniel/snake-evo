@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNAKE TEST</title>
+</head>
+<body style="background:#9bbc0f;color:#0f380f;font-family:monospace;padding:20px;font-size:16px;">
+<div id="s1">Step 1: HTML loaded</div>
+<div id="s2">Step 2: waiting...</div>
+<div id="s3">Step 3: waiting...</div>
+<div id="s4">Step 4: waiting...</div>
+<div id="s5">Step 5: waiting...</div>
+<script>
+document.getElementById('s2').innerHTML = 'Step 2: Script started';
+
+try {
+localStorage.setItem(‘test’,‘1’);
+localStorage.removeItem(‘test’);
+document.getElementById(‘s3’).innerHTML = ‘Step 3: localStorage OK’;
+} catch(e) {
+document.getElementById(‘s3’).innerHTML = ’Step 3: localStorage BLOCKED - ’ + e.message;
+}
+
+document.getElementById(‘s4’).innerHTML = ‘Step 4: canvas test…’;
+var c = document.createElement(‘canvas’);
+c.width = 272; c.height = 192;
+var ctx = c.getContext(‘2d’);
+if(ctx) {
+document.getElementById(‘s4’).innerHTML = ‘Step 4: Canvas OK’;
+} else {
+document.getElementById(‘s4’).innerHTML = ‘Step 4: Canvas FAILED’;
+}
+
+document.getElementById(‘s5’).innerHTML = ‘Step 5: ALL SYSTEMS GO’;
+</script>
+
+</body>
+</html>
