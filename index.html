@@ -629,6 +629,7 @@ function getTutSeen()     { return !!localStorage.getItem('snakeevo_tutseen'); }
 function saveHighScore(s) {
     if (s > getHighScore()) {
         localStorage.setItem('snakeevo_hs', s);
+        if (window.fbSaveScore) window.fbSaveScore(getPlayerName(), s);
         updateStatsBar();
     }
 }
@@ -638,9 +639,12 @@ function saveRegistration(name) {
     if (name && !regs.includes(name)) regs.push(name);
     localStorage.setItem('snakeevo_reg', JSON.stringify(regs));
     localStorage.setItem('snakeevo_name', name);
+    if (window.fbRegister) window.fbRegister(name);
 }
 
 function updateStatsBar() {
+    // When Firebase is active it owns statReg, statActive, statBest via live listeners
+    if (window.fbActive) return;
     let regs = getRegistered();
     let hs   = getHighScore();
     document.getElementById('statReg').innerText    = regs.length;
@@ -1347,6 +1351,79 @@ currentLevelSpeed=calcSpeed(1); lastGrade=null;
 updateUI();
 updateStatsBar();
 drawIdle();
+</script>
+
+<!-- ══ FIREBASE ══════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAnalytics }                           from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
+import { getDatabase, ref, set, get, update,
+         onValue, onDisconnect, serverTimestamp,
+         query, orderByChild, limitToLast }       from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+
+const firebaseConfig = {
+    apiKey:            "AIzaSyCWofv428t3XFKvPX-oDs2YfYvlgD3u4OE",
+    authDomain:        "snake-evo-7ae64.firebaseapp.com",
+    databaseURL:       "https://snake-evo-7ae64-default-rtdb.firebaseio.com",
+    projectId:         "snake-evo-7ae64",
+    storageBucket:     "snake-evo-7ae64.firebasestorage.app",
+    messagingSenderId: "1008625292042",
+    appId:             "1:1008625292042:web:e73e05fb19f92ddef660f3",
+    measurementId:     "G-06CG7E09T0"
+};
+
+const app  = initializeApp(firebaseConfig);
+const db   = getDatabase(app);
+getAnalytics(app);
+
+// Unique session key for presence
+const sid = Math.random().toString(36).slice(2);
+const presRef = ref(db, `presence/${sid}`);
+
+// Presence: mark online, auto-remove on disconnect
+onValue(ref(db, '.info/connected'), snap => {
+    if (!snap.val()) return;
+    set(presRef, { name: window._fbName || 'GUEST', at: serverTimestamp() });
+    onDisconnect(presRef).remove();
+});
+
+// Live: active players
+onValue(ref(db, 'presence'), snap => {
+    const el = document.getElementById('statActive');
+    if (el) el.innerText = snap.exists() ? Object.keys(snap.val()).length : 0;
+});
+
+// Live: registered players
+onValue(ref(db, 'players'), snap => {
+    const el = document.getElementById('statReg');
+    if (el) el.innerText = snap.exists() ? Object.keys(snap.val()).length : 0;
+});
+
+// Live: global best score
+onValue(query(ref(db, 'scores'), orderByChild('score'), limitToLast(1)), snap => {
+    let best = 0;
+    snap.forEach(c => { best = c.val().score; });
+    const el = document.getElementById('statBest');
+    if (el) el.innerText = best || '—';
+});
+
+// Called when player registers
+window.fbRegister = name => {
+    window._fbName = name;
+    set(ref(db, `players/${name}`), { name, at: serverTimestamp() });
+    update(presRef, { name });
+};
+
+// Called when a new high score is set
+window.fbSaveScore = (name, score) => {
+    const r = ref(db, `scores/${name || 'GUEST'}`);
+    get(r).then(snap => {
+        if (!snap.exists() || score > snap.val().score)
+            set(r, { name: name || 'GUEST', score, at: serverTimestamp() });
+    });
+};
+
+window.fbActive = true;
 </script>
 
 </body>
