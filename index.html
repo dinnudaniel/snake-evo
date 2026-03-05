@@ -597,9 +597,10 @@ const ctx    = canvas.getContext('2d');
 
 const COLS = 20, ROWS = 20, CELL = 15;
 const PREY_PER_LEVEL = 16;
-const PREY_PTS   = 5;
-const PREY_COINS = 5;
-const LEVEL_BONUS = 5; // +5 pts/coins on clear → 16×5+5 = 85 total for level 1
+const PREY_PTS        = 1;  // score: 1 point per prey
+const PREY_COINS      = 5;  // coins: 5 per prey (unchanged)
+const LEVEL_BONUS_PTS  = 1;  // +1 score on level clear
+const LEVEL_BONUS_COINS= 5;  // +5 coins on level clear
 
 // Grade thresholds (seconds to clear 16 prey)
 // F only happens on death (hitting wall/self), NEVER on level clear
@@ -952,8 +953,8 @@ function doLevelClear() {
     lastGrade = getGrade(elapsed);
 
     // Always award bonus and reward — F only happens on death, not level clear
-    score += LEVEL_BONUS;
-    coins += LEVEL_BONUS;
+    score += LEVEL_BONUS_PTS;
+    coins += LEVEL_BONUS_COINS;
     updateUI();
     setPendingReward(lastGrade);
     saveHighScore(score);
