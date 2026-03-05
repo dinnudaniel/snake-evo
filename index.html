@@ -244,6 +244,55 @@ canvas{
     max-width:110px;
 }
 
+/* ── LIVE LEADERBOARD ── */
+.leaderboard{
+    width:360px;
+    margin:12px auto 0;
+    background:#111820;
+    border:2px solid #1e3a1e;
+    border-radius:10px;
+    font-family:"Courier New",monospace;
+    overflow:hidden;
+}
+.leaderboard h3{
+    margin:0;
+    padding:6px 10px;
+    background:#1e3a1e;
+    color:#9bbc0f;
+    font-size:11px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:6px;
+}
+.leaderboard h3 .live-dot{
+    width:7px;height:7px;
+    background:#ff4444;
+    border-radius:50%;
+    display:inline-block;
+    animation:blink 1s infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+#lbList{
+    list-style:none;
+    margin:0;
+    padding:4px 0;
+}
+#lbList li{
+    display:flex;
+    justify-content:space-between;
+    padding:3px 12px;
+    font-size:11px;
+    color:#ccc;
+    border-bottom:1px solid #1a2a1a;
+}
+#lbList li:last-child{border-bottom:none;}
+#lbList li .lb-rank{color:#5a6a7a;width:18px;}
+#lbList li .lb-name{flex:1;color:#9bbc0f;}
+#lbList li .lb-score{color:#fff;font-weight:bold;}
+#lbList li.lb-me .lb-name,#lbList li.lb-me .lb-score{color:#ffd700;}
+
 /* ── MENU OVERLAY ── */
 #menuOverlay{
     display:none;
@@ -486,7 +535,7 @@ canvas{
                 <div class="tutRow"><span class="tutIcon C">C</span><span>Score ×1.5 multiplier for next level</span></div>
                 <div class="tutRow"><span class="tutIcon D">D</span><span>Speed hold: keep current speed next level</span></div>
                 <div class="tutRow"><span class="tutIcon E">E</span><span>+5 bonus coins for effort</span></div>
-                <div class="tutRow"><span class="tutIcon F">F</span><span>TOO SLOW — game resets (spend ♥ to survive)</span></div>
+                <div class="tutRow"><span class="tutIcon F">F</span><span>Hit wall or yourself = GAME OVER (spend ♥ to survive)</span></div>
                 <div class="tutNav">
                     <span onclick="skipTutorial()">SKIP</span>
                     <button onclick="nextTutPage()">REGISTER &gt;</button>
@@ -587,6 +636,12 @@ canvas{
     </div>
 </div>
 
+<!-- LIVE LEADERBOARD -->
+<div class="leaderboard">
+    <h3><span class="live-dot"></span> Live Top Scores</h3>
+    <ul id="lbList"><li><span class="lb-rank"></span><span class="lb-name" style="color:#5a6a7a">Loading...</span><span class="lb-score"></span></li></ul>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════
 // SNAKE EVO — Full Engine v3
@@ -597,19 +652,20 @@ const ctx    = canvas.getContext('2d');
 
 const COLS = 20, ROWS = 20, CELL = 15;
 const PREY_PER_LEVEL = 16;
-const PREY_PTS   = 5;
-const PREY_COINS = 5;
-const LEVEL_BONUS = 5; // +5 pts/coins on clear → 16×5+5 = 85 total for level 1
+const PREY_PTS        = 1;  // score: 1 point per prey
+const PREY_COINS      = 5;  // coins: 5 per prey (unchanged)
+const LEVEL_BONUS_PTS  = 1;  // +1 score on level clear
+const LEVEL_BONUS_COINS= 5;  // +5 coins on level clear
 
 // Grade thresholds (seconds to clear 16 prey)
+// F only happens on death (hitting wall/self), NEVER on level clear
 const GRADES = [
     { grade:'S', max:40  },
     { grade:'A', max:60  },
     { grade:'B', max:80  },
     { grade:'C', max:100 },
     { grade:'D', max:130 },
-    { grade:'E', max:160 },
-    { grade:'F', max:Infinity }
+    { grade:'E', max:Infinity }  // slowest time — still clears the level
 ];
 
 const GRADE_COLORS = {
@@ -628,6 +684,7 @@ function getTutSeen()     { return !!localStorage.getItem('snakeevo_tutseen'); }
 function saveHighScore(s) {
     if (s > getHighScore()) {
         localStorage.setItem('snakeevo_hs', s);
+        if (window.fbSaveScore) window.fbSaveScore(getPlayerName(), s);
         updateStatsBar();
     }
 }
@@ -637,9 +694,12 @@ function saveRegistration(name) {
     if (name && !regs.includes(name)) regs.push(name);
     localStorage.setItem('snakeevo_reg', JSON.stringify(regs));
     localStorage.setItem('snakeevo_name', name);
+    if (window.fbRegister) window.fbRegister(name);
 }
 
 function updateStatsBar() {
+    // When Firebase is active it owns statReg, statActive, statBest via live listeners
+    if (window.fbActive) return;
     let regs = getRegistered();
     let hs   = getHighScore();
     document.getElementById('statReg').innerText    = regs.length;
@@ -951,82 +1011,43 @@ function doLevelClear() {
     let elapsed = (Date.now() - levelStartTime) / 1000;
     lastGrade = getGrade(elapsed);
 
-    if (lastGrade !== 'F') {
-        score += LEVEL_BONUS;
-        coins += LEVEL_BONUS;
-        updateUI();
-        setPendingReward(lastGrade);
-    }
+    // Always award bonus and reward — F only happens on death, not level clear
+    score += LEVEL_BONUS_PTS;
+    coins += LEVEL_BONUS_COINS;
+    updateUI();
+    setPendingReward(lastGrade);
     saveHighScore(score);
 
     draw();
 
-    if (lastGrade === 'F') {
-        // F = failure / too slow
-        ctx.fillStyle = 'rgba(20,4,4,0.93)';
-        ctx.fillRect(0, 0, 300, 300);
-        ctx.textAlign = 'center';
+    // Grade screen — always shown on level clear (E is worst possible here)
+    ctx.fillStyle = 'rgba(15,56,15,0.91)';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.textAlign = 'center';
 
-        ctx.fillStyle = GRADE_COLORS['F'];
-        ctx.font = 'bold 64px "Courier New"';
-        ctx.fillText('F', 150, 112);
+    ctx.fillStyle = '#9bbc0f';
+    ctx.font = 'bold 15px "Courier New"';
+    ctx.fillText('LEVEL '+level+' CLEAR!', 150, 40);
 
-        ctx.font = 'bold 14px "Courier New"';
-        ctx.fillText('TOO SLOW!', 150, 142);
+    ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
+    ctx.font = 'bold 62px "Courier New"';
+    ctx.fillText(lastGrade, 150, 118);
 
-        ctx.font = '11px "Courier New"';
-        ctx.fillStyle = '#9bbc0f';
-        ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 166);
-        ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 182);
+    ctx.fillStyle = '#9bbc0f';
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 148);
+    ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 164);
 
-        if (extraLives > 0) {
-            ctx.fillStyle = '#ff6666';
-            ctx.font = 'bold 11px "Courier New"';
-            ctx.fillText('\u2665 USE LIFE \u2192 continue to lv '+(level+1), 150, 212);
-            ctx.fillStyle = '#9bbc0f';
-            ctx.font = '10px "Courier New"';
-            ctx.fillText('('+extraLives+' '+(extraLives===1?'life':'lives')+' remaining)', 150, 226);
-        } else {
-            ctx.fillStyle = '#cc3322';
-            ctx.font = 'bold 12px "Courier New"';
-            ctx.fillText('ELIMINATED', 150, 212);
-            ctx.fillStyle = '#9bbc0f';
-            ctx.font = '10px "Courier New"';
-            ctx.fillText('no lives left \u2014 game resets', 150, 226);
-        }
-        ctx.fillStyle = '#9bbc0f';
-        ctx.fillText('press START', 150, 258);
+    ctx.font = 'bold 12px "Courier New"';
+    ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
+    ctx.fillText('REWARD \u203A '+rewardLabel(lastGrade), 150, 190);
 
-    } else {
-        // Normal grade screen
-        ctx.fillStyle = 'rgba(15,56,15,0.91)';
-        ctx.fillRect(0, 0, 300, 300);
-        ctx.textAlign = 'center';
+    ctx.font = '10px "Courier New"';
+    ctx.fillStyle = '#7a9c4a';
+    ctx.fillText(rewardDesc(lastGrade), 150, 206);
 
-        ctx.fillStyle = '#9bbc0f';
-        ctx.font = 'bold 15px "Courier New"';
-        ctx.fillText('LEVEL '+level+' CLEAR!', 150, 40);
-
-        ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
-        ctx.font = 'bold 62px "Courier New"';
-        ctx.fillText(lastGrade, 150, 118);
-
-        ctx.fillStyle = '#9bbc0f';
-        ctx.font = '11px "Courier New"';
-        ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 148);
-        ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 164);
-
-        ctx.font = 'bold 12px "Courier New"';
-        ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
-        ctx.fillText('REWARD \u203A '+rewardLabel(lastGrade), 150, 190);
-
-        ctx.font = '10px "Courier New"';
-        ctx.fillStyle = '#7a9c4a';
-        ctx.fillText(rewardDesc(lastGrade), 150, 206);
-
-        ctx.fillStyle = '#9bbc0f';
-        ctx.fillText(level < 100 ? 'START \u203A level '+(level+1) : 'START \u203A FINAL!', 150, 250);
-    }
+    ctx.fillStyle = '#9bbc0f';
+    ctx.fillText(level < 100 ? 'START \u203A level '+(level+1) : 'START \u203A FINAL!', 150, 250);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1200,7 +1221,7 @@ function update() {
     snake.unshift(head);
 
     if (head.x === food.x && head.y === food.y) {
-        let pts = Math.round(PREY_PTS * mult);
+        let pts = PREY_PTS;                       // always 1 per prey
         let cts = Math.round(PREY_COINS * mult);
         score += pts; coins += cts; preyEaten++;
         food = spawnFood();
@@ -1276,37 +1297,10 @@ function startGame() {
         }
         return;
     } else if (gState==='levelClear') {
-        if (lastGrade==='F') {
-            if (extraLives > 0) {
-                // Spend a life to survive F grade
-                extraLives--;
-                level++;
-                beginLevel();
-            } else {
-                // True elimination
-                let lv=level, sc=score, co=coins;
-                saveHighScore(sc);
-                resetGame();
-                gState = 'gameOver';
-                ctx.fillStyle = '#0a0404';
-                ctx.fillRect(0, 0, 300, 300);
-                ctx.textAlign = 'center';
-                ctx.fillStyle = GRADE_COLORS['F'];
-                ctx.font = 'bold 42px "Courier New"';
-                ctx.fillText('F', 150, 88);
-                ctx.font = 'bold 16px "Courier New"';
-                ctx.fillStyle = '#cc3322';
-                ctx.fillText('ELIMINATED', 150, 120);
-                ctx.font = '11px "Courier New"';
-                ctx.fillStyle = '#9bbc0f';
-                ctx.fillText('LV '+lv+'  SCORE '+sc+'  \u00A2'+co, 150, 152);
-                ctx.fillText('press START to try again', 150, 210);
-            }
-        } else {
-            if (level >= 100) { drawWin(); return; }
-            level++;
-            beginLevel();
-        }
+        // F grade only happens on death — level clear always advances
+        if (level >= 100) { drawWin(); return; }
+        level++;
+        beginLevel();
     }
 }
 
@@ -1412,6 +1406,97 @@ currentLevelSpeed=calcSpeed(1); lastGrade=null;
 updateUI();
 updateStatsBar();
 drawIdle();
+</script>
+
+<!-- ══ FIREBASE ══════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAnalytics }                           from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
+import { getDatabase, ref, set, get, update,
+         onValue, onDisconnect, serverTimestamp,
+         query, orderByChild, limitToLast }       from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+
+const firebaseConfig = {
+    apiKey:            "AIzaSyCWofv428t3XFKvPX-oDs2YfYvlgD3u4OE",
+    authDomain:        "snake-evo-7ae64.firebaseapp.com",
+    databaseURL:       "https://snake-evo-7ae64-default-rtdb.firebaseio.com",
+    projectId:         "snake-evo-7ae64",
+    storageBucket:     "snake-evo-7ae64.firebasestorage.app",
+    messagingSenderId: "1008625292042",
+    appId:             "1:1008625292042:web:e73e05fb19f92ddef660f3",
+    measurementId:     "G-06CG7E09T0"
+};
+
+const app  = initializeApp(firebaseConfig);
+const db   = getDatabase(app);
+getAnalytics(app);
+
+// Unique session key for presence
+const sid = Math.random().toString(36).slice(2);
+const presRef = ref(db, `presence/${sid}`);
+
+// Presence: mark online, auto-remove on disconnect
+onValue(ref(db, '.info/connected'), snap => {
+    if (!snap.val()) return;
+    set(presRef, { name: window._fbName || 'GUEST', at: serverTimestamp() });
+    onDisconnect(presRef).remove();
+});
+
+// Live: active players
+onValue(ref(db, 'presence'), snap => {
+    const el = document.getElementById('statActive');
+    if (el) el.innerText = snap.exists() ? Object.keys(snap.val()).length : 0;
+});
+
+// Live: registered players
+onValue(ref(db, 'players'), snap => {
+    const el = document.getElementById('statReg');
+    if (el) el.innerText = snap.exists() ? Object.keys(snap.val()).length : 0;
+});
+
+// Live: global best score
+onValue(query(ref(db, 'scores'), orderByChild('score'), limitToLast(1)), snap => {
+    let best = 0;
+    snap.forEach(c => { best = c.val().score; });
+    const el = document.getElementById('statBest');
+    if (el) el.innerText = best || '—';
+});
+
+// Live: top-10 leaderboard
+onValue(query(ref(db, 'scores'), orderByChild('score'), limitToLast(10)), snap => {
+    const list = document.getElementById('lbList');
+    if (!list) return;
+    const entries = [];
+    snap.forEach(c => entries.push(c.val()));
+    entries.sort((a, b) => b.score - a.score);
+    if (!entries.length) {
+        list.innerHTML = '<li><span class="lb-rank"></span><span class="lb-name" style="color:#5a6a7a">No scores yet</span><span class="lb-score"></span></li>';
+        return;
+    }
+    list.innerHTML = entries.map((e, i) => {
+        const me = e.name === (window._fbName || '__') ? ' lb-me' : '';
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
+        return `<li class="${me}"><span class="lb-rank">${medal}</span><span class="lb-name">${e.name || 'GUEST'}</span><span class="lb-score">${e.score}</span></li>`;
+    }).join('');
+});
+
+// Called when player registers
+window.fbRegister = name => {
+    window._fbName = name;
+    set(ref(db, `players/${name}`), { name, at: serverTimestamp() });
+    update(presRef, { name });
+};
+
+// Called when a new high score is set
+window.fbSaveScore = (name, score) => {
+    const r = ref(db, `scores/${name || 'GUEST'}`);
+    get(r).then(snap => {
+        if (!snap.exists() || score > snap.val().score)
+            set(r, { name: name || 'GUEST', score, at: serverTimestamp() });
+    });
+};
+
+window.fbActive = true;
 </script>
 
 </body>
