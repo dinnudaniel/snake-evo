@@ -700,23 +700,23 @@ const SPECIES = [
     // Tier 9 — apex constrictors (L92-100)
     'BALL PYTHON','BURMESE PYTHON','AFRICAN ROCK PYTHON','RETICULATED PYTHON','GREEN ANACONDA'
 ];
-// [headColor, bodyColor, eyeColor] — 10 tiers, 5 species each
+// [headColor, bodyColor, eyeColor] — 10 tiers, change every 2 species (every 4 levels)
 const SPECIES_TIERS = [
-    ['#3a8c3a','#1a5a1a','#aaffaa'], // T0  harmless greens
-    ['#6a8c2a','#2a4a0a','#ccff44'], // T1  yellow-green
-    ['#7a6c2a','#3a3808','#ddcc44'], // T2  olive
-    ['#8a6a1a','#4a2808','#ddaa44'], // T3  brown
-    ['#9a5c1a','#4a2808','#ffaa33'], // T4  orange rattlers
-    ['#9a3a1a','#5a1808','#ff6633'], // T5  dangerous vipers
-    ['#7a1a1a','#3a0808','#ff4444'], // T6  cobras red
-    ['#4a1a4a','#200820','#dd44dd'], // T7  mambas purple
-    ['#1a2a4a','#080a20','#4488ff'], // T8  taipan blue
-    ['#141414','#080808','#ffcc00'], // T9  apex black/gold
+    ['#22ee22','#0a6a0a','#aaffaa'], // T0  neon green    (L2-5)
+    ['#ccdd00','#5a5a00','#ffff66'], // T1  yellow        (L6-9)
+    ['#ff9900','#7a3300','#ffcc66'], // T2  orange        (L10-13)
+    ['#ff4400','#8a1500','#ff8866'], // T3  red-orange    (L14-17)
+    ['#ee0000','#770000','#ff6666'], // T4  red           (L18-21)
+    ['#cc0044','#660022','#ff4488'], // T5  crimson       (L22-25)
+    ['#9900cc','#4a0066','#dd66ff'], // T6  purple        (L26-29)
+    ['#5500ff','#220088','#9966ff'], // T7  violet        (L30-33)
+    ['#0044ff','#001a88','#6688ff'], // T8  blue          (L34-37)
+    ['#111111','#050505','#ffcc00'], // T9  black/gold    (L38+)
 ];
 function getSpeciesData(lv) {
     if (!lv || lv < 2) return { name:null, head:'#1e6a1e', body:'#0f380f', eye:'#9bbc0f' };
     let idx = Math.min(Math.floor((lv - 2) / 2), SPECIES.length - 1);
-    let tier = Math.min(Math.floor(idx / 5), 9);
+    let tier = Math.min(Math.floor(idx / 2), 9);
     let [head, body, eye] = SPECIES_TIERS[tier];
     return { name: SPECIES[idx], head, body, eye };
 }
@@ -1621,12 +1621,12 @@ onValue(ref(db, 'players'), snap => {
     if (el) el.innerText = snap.exists() ? Object.keys(snap.val()).length : 0;
 });
 
-// Live: global best score
+// Live: best score (personal best, or global if higher)
 onValue(query(ref(db, 'scores'), orderByChild('score'), limitToLast(1)), snap => {
     let best = 0;
     snap.forEach(c => { best = c.val().score; });
     const el = document.getElementById('statBest');
-    if (el) el.innerText = best || '—';
+    if (el) el.innerText = Math.max(best, getHighScore()) || '—';
 });
 
 // Live: top-10 leaderboard
