@@ -696,7 +696,7 @@ const GRADE_COLORS = {
 function getRegistered()  { return JSON.parse(localStorage.getItem('snakeevo_reg') || '[]'); }
 function getHighScore()   { return parseInt(localStorage.getItem('snakeevo_hs') || '0'); }
 function getPlayerName()  { return localStorage.getItem('snakeevo_name') || ''; }
-function getTutSeen()     { return !!localStorage.getItem('snakeevo_tutseen'); }
+function getTutSeen()     { return !!sessionStorage.getItem('snakeevo_tutseen'); }
 
 function saveHighScore(s) {
     if (s > getHighScore()) {
@@ -1305,7 +1305,7 @@ function startGame() {
     if (gState==='tutorial' || gState==='register') return;
     if (gState==='idle' || gState==='gameOver' || gState==='win') {
         if (!getTutSeen()) {
-            localStorage.setItem('snakeevo_tutseen', '1');
+            sessionStorage.setItem('snakeevo_tutseen', '1');
             showTutorial();
         } else if (!getPlayerName()) {
             showRegister();
@@ -1451,6 +1451,13 @@ getAnalytics(app);
 // Unique session key for presence
 const sid = Math.random().toString(36).slice(2);
 const presRef = ref(db, `presence/${sid}`);
+
+// Re-register returning players so they appear in Firebase players count
+const savedName = localStorage.getItem('snakeevo_name');
+if (savedName) {
+    window._fbName = savedName;
+    set(ref(db, `players/${savedName}`), { name: savedName, at: serverTimestamp() });
+}
 
 // Presence: mark online, auto-remove on disconnect
 onValue(ref(db, '.info/connected'), snap => {
