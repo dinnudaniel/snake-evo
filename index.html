@@ -675,6 +675,60 @@ const GRADE_COLORS = {
 };
 
 // ══════════════════════════════════════════════════════
+// SNAKE SPECIES EVOLUTION (Level 3+)
+// ══════════════════════════════════════════════════════
+const SPECIES = [
+    null, null,
+    'EGG-EATING SNAKE','RING-NECKED SNAKE','SMOOTH GREEN SNAKE',
+    'GARTER SNAKE','RIBBON SNAKE','MILK SNAKE','CORN SNAKE','KING SNAKE',
+    'RAT SNAKE','BULL SNAKE','COACHWHIP','INDIGO SNAKE','HOGNOSE SNAKE',
+    'RACER SNAKE','NIGHT SNAKE','VINE SNAKE','MUD SNAKE','FLYING SNAKE',
+    'CAT-EYED SNAKE','MANGROVE SNAKE','BANDED TREE SNAKE','RAINBOW SNAKE',
+    'WATER MOCCASIN','COPPERHEAD','SIDEWINDER','PYGMY RATTLESNAKE',
+    'MASSASAUGA','TIMBER RATTLESNAKE',
+    'WESTERN DIAMONDBACK','EASTERN DIAMONDBACK','FER-DE-LANCE','BUSHMASTER',
+    'GABOON VIPER','PUFF ADDER','SAW-SCALED VIPER',"RUSSELL'S VIPER",
+    'HORNED VIPER','BOOMSLANG',
+    'TWIG SNAKE','STILETTO SNAKE','NIGHT ADDER','CAPE COBRA','FOREST COBRA',
+    'EGYPTIAN COBRA','INDIAN COBRA','MONOCLED COBRA','SPITTING COBRA','KING COBRA',
+    'GREEN MAMBA',"JAMESON'S MAMBA",'EASTERN GREEN MAMBA','BLACK MAMBA',
+    'COMMON KRAIT','BANDED KRAIT','INDIAN KRAIT','SEA KRAIT',
+    'YELLOW SEA SNAKE','OLIVE SEA SNAKE',
+    'BEAKED SEA SNAKE','TIGER SNAKE','AUSTRALIAN COPPERHEAD','EASTERN BROWN SNAKE',
+    'COASTAL TAIPAN','INLAND TAIPAN','DEATH ADDER','MULGA SNAKE',
+    'TIGER RATTLESNAKE','MOJAVE RATTLESNAKE',
+    'SPECKLED RATTLESNAKE','RED DIAMOND RATTLER','PACIFIC RATTLESNAKE',
+    'BALL PYTHON','BLOOD PYTHON','CARPET PYTHON','GREEN TREE PYTHON',
+    'AMETHYSTINE PYTHON','AFRICAN ROCK PYTHON','BURMESE PYTHON',
+    'RETICULATED PYTHON','YELLOW ANACONDA','DARK-SPOTTED ANACONDA',
+    'BOLIVIAN ANACONDA','BENI ANACONDA','HAIRY BUSH VIPER',
+    "EYELASH PALM PIT VIPER","WAGLER'S PIT VIPER",'BAMBOO PIT VIPER',
+    'WHITE-LIPPED PIT VIPER',
+    "POPE'S PIT VIPER",'MALAYAN PIT VIPER','CHAIN VIPER',"FEA'S VIPER",
+    'HUNDRED PACER','MANY-BANDED KRAIT','LONG-GLANDED CORAL SNAKE',
+    'BANDED SEA KRAIT','OLIVE PYTHON','GREEN ANACONDA'
+];
+const SPECIES_TIERS = [
+    ['#2a7a2a','#1a5a1a','#88ff88'], // T0 L3-12   harmless greens
+    ['#6a6a1a','#3a3808','#dddd44'], // T1 L13-22  olive
+    ['#7a5a1a','#4a2808','#ddaa44'], // T2 L23-32  brown
+    ['#8a5a1a','#4a2808','#ffaa33'], // T3 L33-42  orange-brown
+    ['#8a3a1a','#4a1008','#ff6633'], // T4 L43-52  venomous orange
+    ['#6a1a1a','#3a0808','#ff4444'], // T5 L53-62  deadly red
+    ['#4a1a4a','#200820','#cc44cc'], // T6 L63-72  dark purple
+    ['#1a1a4a','#080820','#5555ee'], // T7 L73-82  python blue
+    ['#1a3a3a','#081818','#44cccc'], // T8 L83-92  anaconda teal
+    ['#101010','#080808','#ffcc00'], // T9 L93-100 apex black/gold
+];
+function getSpeciesData(lv) {
+    if (!lv || lv < 3) return { name:null, head:'#1e6a1e', body:'#0f380f', eye:'#9bbc0f' };
+    let name = SPECIES[lv - 1] || null;
+    let tier = Math.min(Math.floor((lv - 3) / 10), 9);
+    let [head, body, eye] = SPECIES_TIERS[tier];
+    return { name, head, body, eye };
+}
+
+// ══════════════════════════════════════════════════════
 // STORAGE (localStorage)
 // ══════════════════════════════════════════════════════
 function getRegistered()  { return JSON.parse(localStorage.getItem('snakeevo_reg') || '[]'); }
@@ -968,17 +1022,29 @@ function draw() {
     ctx.fillRect(food.x*CELL+2, food.y*CELL+2, 3, 3);
 
     // Snake — semi-transparent when ghost active
+    const sp = getSpeciesData(level);
     ctx.globalAlpha = ghostActive ? 0.38 : 1.0;
     snake.forEach((s, i) => {
-        ctx.fillStyle = i === 0 ? '#1e6a1e' : '#0f380f';
+        ctx.fillStyle = i === 0 ? sp.head : sp.body;
         ctx.fillRect(s.x*CELL+1, s.y*CELL+1, CELL-3, CELL-3);
         if (i === 0) {
-            ctx.fillStyle = ghostActive ? '#ccff44' : '#9bbc0f';
+            ctx.fillStyle = ghostActive ? '#ccff44' : sp.eye;
             ctx.fillRect(s.x*CELL+3, s.y*CELL+3, 2, 2);
             ctx.fillRect(s.x*CELL+8, s.y*CELL+3, 2, 2);
         }
     });
     ctx.globalAlpha = 1.0;
+
+    // Species name (bottom-right, level 3+)
+    if (sp.name) {
+        ctx.font = '7px "Courier New"';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillText(sp.name, 299, 298);
+        ctx.fillStyle = sp.eye;
+        ctx.fillText(sp.name, 298, 297);
+        ctx.textAlign = 'center';
+    }
 
     // HUD — active reward indicators
     let hud = [];
@@ -1046,8 +1112,19 @@ function doLevelClear() {
     ctx.fillStyle = '#7a9c4a';
     ctx.fillText(rewardDesc(lastGrade), 150, 206);
 
+    // Species evolution preview
+    const nextSp = getSpeciesData(level + 1);
+    if (nextSp.name) {
+        ctx.font = '9px "Courier New"';
+        ctx.fillStyle = nextSp.eye;
+        ctx.fillText('EVOLVING INTO:', 150, 224);
+        ctx.font = 'bold 10px "Courier New"';
+        ctx.fillText(nextSp.name, 150, 238);
+    }
+
+    ctx.font = '10px "Courier New"';
     ctx.fillStyle = '#9bbc0f';
-    ctx.fillText(level < 100 ? 'START \u203A level '+(level+1) : 'START \u203A FINAL!', 150, 250);
+    ctx.fillText(level < 100 ? 'START \u203A level '+(level+1) : 'START \u203A FINAL!', 150, 258);
 }
 
 // ══════════════════════════════════════════════════════
