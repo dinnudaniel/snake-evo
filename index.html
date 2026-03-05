@@ -511,7 +511,7 @@ canvas{
                 </div>
                 <div class="tutRow">
                     <span class="tutIcon">F</span>
-                    <span>Each food = 5 pts &amp; 5 coins. Eat 16 prey to clear the level.</span>
+                    <span>Each food = 1 pt &amp; 5 coins. Eat 16 prey to clear the level.</span>
                 </div>
                 <div class="tutRow">
                     <span class="tutIcon">X</span>
@@ -532,7 +532,7 @@ canvas{
                 <div class="tutRow"><span class="tutIcon S">S</span><span>Extra life stored (max 3) — fastest clear</span></div>
                 <div class="tutRow"><span class="tutIcon A">A</span><span>Ghost mode: pass through your own body</span></div>
                 <div class="tutRow"><span class="tutIcon B">B</span><span>Obstacle pass: go through wall blocks</span></div>
-                <div class="tutRow"><span class="tutIcon C">C</span><span>Score ×1.5 multiplier for next level</span></div>
+                <div class="tutRow"><span class="tutIcon C">C</span><span>Coins ×1.5 multiplier for next level</span></div>
                 <div class="tutRow"><span class="tutIcon D">D</span><span>Speed hold: keep current speed next level</span></div>
                 <div class="tutRow"><span class="tutIcon E">E</span><span>+5 bonus coins for effort</span></div>
                 <div class="tutRow"><span class="tutIcon F">F</span><span>Hit wall or yourself = GAME OVER (spend ♥ to survive)</span></div>
@@ -891,7 +891,7 @@ function getGrade(secs) {
 function rewardLabel(g) {
     return ({
         S:'EXTRA LIFE', A:'GHOST MODE', B:'OBSTACLE PASS',
-        C:'1.5x SCORE', D:'SPEED HOLD', E:'KEEP IT UP!', F:'YOU LOSE'
+        C:'1.5x COINS', D:'SPEED HOLD', E:'KEEP IT UP!', F:'YOU LOSE'
     })[g] || '';
 }
 
@@ -900,7 +900,7 @@ function rewardDesc(g) {
         S:'One free death stored (\u2665 max 3)',
         A:'Pass through your own body',
         B:'Pass through obstacle walls',
-        C:'Score \xd71.5 next level',
+        C:'Coins \xd71.5 next level',
         D:'Next level keeps this speed',
         E:'+5 bonus coins for effort',
         F:'Too slow \u2014 game resets (spend \u2665 to survive)'
@@ -989,7 +989,7 @@ function draw() {
     if (obstPassActive && Date.now() < obstPassEnd)
         hud.push({ text: 'PASS '+Math.ceil((obstPassEnd-Date.now())/1000)+'s', col: '#44aaff' });
     if (mult > 1.0 && Date.now() < multEnd)
-        hud.push({ text: mult+'x '+Math.ceil((multEnd-Date.now())/1000)+'s', col: '#ffcc44' });
+        hud.push({ text: 'COINS '+mult+'x '+Math.ceil((multEnd-Date.now())/1000)+'s', col: '#ffcc44' });
 
     if (hud.length) {
         let bw = 92, bh = hud.length*14+6;
