@@ -244,6 +244,55 @@ canvas{
     max-width:110px;
 }
 
+/* ── LIVE LEADERBOARD ── */
+.leaderboard{
+    width:360px;
+    margin:12px auto 0;
+    background:#111820;
+    border:2px solid #1e3a1e;
+    border-radius:10px;
+    font-family:"Courier New",monospace;
+    overflow:hidden;
+}
+.leaderboard h3{
+    margin:0;
+    padding:6px 10px;
+    background:#1e3a1e;
+    color:#9bbc0f;
+    font-size:11px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:6px;
+}
+.leaderboard h3 .live-dot{
+    width:7px;height:7px;
+    background:#ff4444;
+    border-radius:50%;
+    display:inline-block;
+    animation:blink 1s infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+#lbList{
+    list-style:none;
+    margin:0;
+    padding:4px 0;
+}
+#lbList li{
+    display:flex;
+    justify-content:space-between;
+    padding:3px 12px;
+    font-size:11px;
+    color:#ccc;
+    border-bottom:1px solid #1a2a1a;
+}
+#lbList li:last-child{border-bottom:none;}
+#lbList li .lb-rank{color:#5a6a7a;width:18px;}
+#lbList li .lb-name{flex:1;color:#9bbc0f;}
+#lbList li .lb-score{color:#fff;font-weight:bold;}
+#lbList li.lb-me .lb-name,#lbList li.lb-me .lb-score{color:#ffd700;}
+
 /* ── MENU OVERLAY ── */
 #menuOverlay{
     display:none;
@@ -585,6 +634,12 @@ canvas{
         <span class="statVal" id="statBest">—</span>
         <span class="statLabel">Highest Score<br>in the Game</span>
     </div>
+</div>
+
+<!-- LIVE LEADERBOARD -->
+<div class="leaderboard">
+    <h3><span class="live-dot"></span> Live Top Scores</h3>
+    <ul id="lbList"><li><span class="lb-rank"></span><span class="lb-name" style="color:#5a6a7a">Loading...</span><span class="lb-score"></span></li></ul>
 </div>
 
 <script>
@@ -1166,7 +1221,7 @@ function update() {
     snake.unshift(head);
 
     if (head.x === food.x && head.y === food.y) {
-        let pts = Math.round(PREY_PTS * mult);
+        let pts = PREY_PTS;                       // always 1 per prey
         let cts = Math.round(PREY_COINS * mult);
         score += pts; coins += cts; preyEaten++;
         food = spawnFood();
@@ -1405,6 +1460,24 @@ onValue(query(ref(db, 'scores'), orderByChild('score'), limitToLast(1)), snap =>
     snap.forEach(c => { best = c.val().score; });
     const el = document.getElementById('statBest');
     if (el) el.innerText = best || '—';
+});
+
+// Live: top-10 leaderboard
+onValue(query(ref(db, 'scores'), orderByChild('score'), limitToLast(10)), snap => {
+    const list = document.getElementById('lbList');
+    if (!list) return;
+    const entries = [];
+    snap.forEach(c => entries.push(c.val()));
+    entries.sort((a, b) => b.score - a.score);
+    if (!entries.length) {
+        list.innerHTML = '<li><span class="lb-rank"></span><span class="lb-name" style="color:#5a6a7a">No scores yet</span><span class="lb-score"></span></li>';
+        return;
+    }
+    list.innerHTML = entries.map((e, i) => {
+        const me = e.name === (window._fbName || '__') ? ' lb-me' : '';
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
+        return `<li class="${me}"><span class="lb-rank">${medal}</span><span class="lb-name">${e.name || 'GUEST'}</span><span class="lb-score">${e.score}</span></li>`;
+    }).join('');
 });
 
 // Called when player registers
