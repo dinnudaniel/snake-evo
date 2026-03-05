@@ -335,19 +335,19 @@ canvas{
 
 <script>
 // ═══════════════════════════════════════════════════════
-// SNAKE EVO — Full Engine
+// SNAKE EVO — Full Engine v3
 // ═══════════════════════════════════════════════════════
 
 const canvas = document.getElementById('game');
 const ctx    = canvas.getContext('2d');
 
 const COLS = 20, ROWS = 20, CELL = 15;
-const PREY_PER_LEVEL = 16;   // prey needed to clear each level
-const PREY_PTS   = 5;        // points per prey
-const PREY_COINS = 5;        // cents per prey
-const LEVEL_BONUS = 5;       // bonus pts awarded at level clear (80 prey pts + 5 bonus = 85 total for level 1)
+const PREY_PER_LEVEL = 16;
+const PREY_PTS   = 5;
+const PREY_COINS = 5;
+const LEVEL_BONUS = 5; // +5 pts/coins on clear → 16×5+5 = 85 total for level 1
 
-// Grade thresholds in seconds (how fast you cleared the level)
+// Grade thresholds (seconds to clear 16 prey)
 const GRADES = [
     { grade:'S', max:40  },
     { grade:'A', max:60  },
@@ -360,32 +360,45 @@ const GRADES = [
 
 const GRADE_COLORS = {
     S:'#ffff44', A:'#88ff88', B:'#44aaff',
-    C:'#ffaa44', D:'#ff8844', E:'#cc7755', F:'#aa5533'
+    C:'#ffaa44', D:'#ff8844', E:'#aabbaa', F:'#cc3322'
 };
 
 // ── State ──────────────────────────────────────────────
-// idle | playing | paused | levelClear | gameOver | win
+// idle | playing | paused | respawning | levelClear | gameOver | win
 let gState = 'idle';
 let snake, food, dx, dy;
 let score, level, coins, preyEaten;
 let levelStartTime, loopTimer = null, speed;
+let currentLevelSpeed = 280; // actual speed used this level (for D grade)
+let lastGrade = null;
 
 // ── Active Rewards ──────────────────────────────────────
-let ghostActive = false, ghostEnd = 0;   // S: pass through own body
-let mult = 1.0, multEnd = 0;             // B/C/D: score multiplier
-let wallMode = false;                    // A: obstacle walls appear level 2+
-let easyNext  = false;                   // F consolation: reduced speed next level
-let pendingReward = null;                // reward queued for next level start
+let extraLives = 0;                                  // S: survive a death or F once (max 3)
+let ghostActive = false, ghostEnd = 0;               // A: pass through own body
+let obstPassActive = false, obstPassEnd = 0;         // B: pass through obstacle walls
+let mult = 1.0, multEnd = 0;                         // C: score × 1.5
+let speedHold = false;                               // D: next level keeps this speed
+let pendingReward = null;
 
-// ── Obstacles ──────────────────────────────────────────
+// ── Obstacles (always active level 2+, no grade needed) ──
 let obstacles = [];
-let wallGrowAt = 0;
+let wallEvolveAt = 0; // 0 = disabled (before level 10)
 
 // ══════════════════════════════════════════════════════
-// SPEED — Level 1 = 280ms, Level 100 = 80ms (linear)
+// SPEED — L1=280ms, L100=80ms linear
 // ══════════════════════════════════════════════════════
 function calcSpeed(lv) {
     return Math.max(80, Math.round(280 - (lv - 1) * (200 / 99)));
+}
+
+// ══════════════════════════════════════════════════════
+// OBSTACLE COUNT PER LEVEL
+// L2=1, L3=2, L4=3, then +1 every 6 levels, max 8
+// ══════════════════════════════════════════════════════
+function obstaclesForLevel() {
+    if (level < 2) return 0;
+    if (level <= 4) return level - 1;
+    return Math.min(3 + Math.floor((level - 4) / 6), 8);
 }
 
 // ══════════════════════════════════════════════════════
@@ -405,17 +418,10 @@ function spawnFood() {
 
 // ══════════════════════════════════════════════════════
 // OBSTACLE WALLS
-// Level 2+: 1 wall. +1 wall every 5 levels, max 4.
-// Walls grow every 15 seconds.
 // ══════════════════════════════════════════════════════
-function wallsForLevel() {
-    if (!wallMode || level < 2) return 0;
-    return Math.min(1 + Math.floor((level - 2) / 5), 4);
-}
-
 function spawnObstacles() {
     obstacles = [];
-    let n = wallsForLevel();
+    let n = obstaclesForLevel();
     for (let i = 0; i < n; i++) addOneObstacle();
 }
 
@@ -423,30 +429,27 @@ function addOneObstacle() {
     for (let t = 0; t < 200; t++) {
         let ox = 2 + Math.floor(Math.random() * 15);
         let oy = 2 + Math.floor(Math.random() * 15);
-        // Not near snake start position
         if (snake.some(s => Math.abs(s.x - ox) < 5 && Math.abs(s.y - oy) < 5)) continue;
-        // Not overlapping existing obstacles
         if (obstacles.some(o => Math.abs(o.x - ox) < 4 && Math.abs(o.y - oy) < 4)) continue;
-        // L-shape (3 cells) or 2×2 (4 cells)
         let cells = Math.random() < 0.5
-            ? [{x:ox,y:oy},{x:ox+1,y:oy},{x:ox,y:oy+1}]
-            : [{x:ox,y:oy},{x:ox+1,y:oy},{x:ox,y:oy+1},{x:ox+1,y:oy+1}];
+            ? [{x:ox,y:oy},{x:ox+1,y:oy},{x:ox,y:oy+1}]           // L-shape
+            : [{x:ox,y:oy},{x:ox+1,y:oy},{x:ox,y:oy+1},{x:ox+1,y:oy+1}]; // 2×2
         obstacles = obstacles.concat(cells);
         break;
     }
 }
 
+// Grow 1 cell — only called from level 10+
 function growObstacle() {
-    if (obstacles.length === 0) return;
     const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
     let cands = [];
     obstacles.forEach(w => {
         dirs.forEach(d => {
-            let nx = w.x + d.dx, ny = w.y + d.dy;
+            let nx = w.x+d.dx, ny = w.y+d.dy;
             if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS &&
-                !obstacles.some(o => o.x === nx && o.y === ny) &&
-                !snake.some(s => s.x === nx && s.y === ny) &&
-                !(food && food.x === nx && food.y === ny)) {
+                !obstacles.some(o => o.x===nx && o.y===ny) &&
+                !snake.some(s => s.x===nx && s.y===ny) &&
+                !(food && food.x===nx && food.y===ny)) {
                 cands.push({x:nx, y:ny});
             }
         });
@@ -454,8 +457,24 @@ function growObstacle() {
     if (cands.length) obstacles.push(cands[Math.floor(Math.random() * cands.length)]);
 }
 
+// Shrink 1 cell — only called from level 10+
+function shrinkObstacle() {
+    if (obstacles.length > 1) obstacles.splice(Math.floor(Math.random() * obstacles.length), 1);
+}
+
+// Randomly grow OR shrink — only active from level 10
+// Interval: 30s at L10, scaling down to 20s at L50+
+function evolveObstacles() {
+    if (obstacles.length === 0) return;
+    Math.random() < 0.65 ? growObstacle() : shrinkObstacle();
+    let interval = Math.max(20000, 30000 - (level - 10) * 250);
+    wallEvolveAt = Date.now() + interval;
+}
+
 // ══════════════════════════════════════════════════════
 // GRADE & REWARDS
+// S=extra life | A=ghost | B=obstacle pass | C=score×1.5
+// D=speed hold | E=+5¢ | F=GAME OVER (lose life to survive)
 // ══════════════════════════════════════════════════════
 function getGrade(secs) {
     return (GRADES.find(g => secs <= g.max) || {grade:'F'}).grade;
@@ -463,48 +482,44 @@ function getGrade(secs) {
 
 function rewardLabel(g) {
     return ({
-        S: 'GHOST MODE',
-        A: 'WALL OBSTACLES',
-        B: '2x SCORE BOOST',
-        C: '1.5x SCORE BOOST',
-        D: '1.25x SCORE BOOST',
-        E: 'NONE',
-        F: 'EASY START'
-    })[g] || 'NONE';
+        S:'EXTRA LIFE', A:'GHOST MODE', B:'OBSTACLE PASS',
+        C:'1.5x SCORE', D:'SPEED HOLD', E:'KEEP IT UP!', F:'YOU LOSE'
+    })[g] || '';
 }
 
 function rewardDesc(g) {
     return ({
-        S: 'Pass through your own body',
-        A: 'Pop-up walls appear in levels',
-        B: 'Score x2 next level',
-        C: 'Score x1.5 next level',
-        D: 'Score x1.25 next level',
-        E: 'Keep grinding!',
-        F: 'Easier speed next level'
+        S:'One free death stored (\u2665 max 3)',
+        A:'Pass through your own body',
+        B:'Pass through obstacle walls',
+        C:'Score \xd71.5 next level',
+        D:'Next level keeps this speed',
+        E:'+5 bonus coins for effort',
+        F:'Too slow \u2014 game resets (spend \u2665 to survive)'
     })[g] || '';
 }
 
 function setPendingReward(g) {
-    // Reward duration grows with level (capped at +60s)
-    let bonus = Math.min(level * 3, 60);
+    let bonus = Math.min(level * 3, 60); // reward duration grows with level
     pendingReward =
-        g === 'S' ? {type:'ghost',   dur: 30 + bonus} :
-        g === 'A' ? {type:'wallMode'} :
-        g === 'B' ? {type:'mult', val:2.0,  dur: 20 + bonus} :
-        g === 'C' ? {type:'mult', val:1.5,  dur: 15 + bonus} :
-        g === 'D' ? {type:'mult', val:1.25, dur: 10 + bonus} :
-        g === 'F' ? {type:'easy'} :
-        null;
+        g==='S' ? {type:'extraLife'} :
+        g==='A' ? {type:'ghost',    dur: 30 + bonus} :
+        g==='B' ? {type:'obstPass', dur: 20 + bonus} :
+        g==='C' ? {type:'mult', val: 1.5, dur: 15 + bonus} :
+        g==='D' ? {type:'speedHold'} :
+        g==='E' ? {type:'encourage'} :
+        null; // F = game over, no reward
 }
 
 function activatePending() {
     if (!pendingReward) return;
     const r = pendingReward; pendingReward = null;
-    if      (r.type === 'ghost')    { ghostActive = true; ghostEnd = Date.now() + r.dur * 1000; }
-    else if (r.type === 'wallMode') { wallMode = true; }
-    else if (r.type === 'mult')     { mult = r.val; multEnd = Date.now() + r.dur * 1000; }
-    else if (r.type === 'easy')     { easyNext = true; }
+    if      (r.type==='extraLife') { extraLives = Math.min(extraLives + 1, 3); }
+    else if (r.type==='ghost')     { ghostActive = true; ghostEnd = Date.now() + r.dur*1000; }
+    else if (r.type==='obstPass')  { obstPassActive = true; obstPassEnd = Date.now() + r.dur*1000; }
+    else if (r.type==='mult')      { mult = r.val; multEnd = Date.now() + r.dur*1000; }
+    else if (r.type==='speedHold') { speedHold = true; }
+    else if (r.type==='encourage') { coins += 5; updateUI(); }
 }
 
 // ══════════════════════════════════════════════════════
@@ -520,7 +535,6 @@ function updateUI() {
 // DRAW
 // ══════════════════════════════════════════════════════
 function draw() {
-    // Background
     ctx.fillStyle = '#8bac0f';
     ctx.fillRect(0, 0, 300, 300);
 
@@ -528,222 +542,261 @@ function draw() {
     ctx.fillStyle = '#7a9c0a';
     for (let x = 0; x < COLS; x++)
         for (let y = 0; y < ROWS; y++)
-            ctx.fillRect(x * CELL + 6, y * CELL + 6, 2, 2);
+            ctx.fillRect(x*CELL+6, y*CELL+6, 2, 2);
 
-    // Obstacle walls
+    // Obstacles — blue tint when obstacle pass active (visual cue)
     obstacles.forEach(o => {
-        ctx.fillStyle = '#3d2a08';
-        ctx.fillRect(o.x * CELL, o.y * CELL, CELL - 1, CELL - 1);
-        ctx.fillStyle = '#5c4418';
-        ctx.fillRect(o.x * CELL + 2, o.y * CELL + 2, CELL - 5, CELL - 5);
+        ctx.fillStyle = obstPassActive ? '#1a2a5a' : '#3d2a08';
+        ctx.fillRect(o.x*CELL, o.y*CELL, CELL-1, CELL-1);
+        ctx.fillStyle = obstPassActive ? '#3a5aaa' : '#5c4418';
+        ctx.fillRect(o.x*CELL+2, o.y*CELL+2, CELL-5, CELL-5);
     });
 
     // Food
     ctx.fillStyle = '#306230';
-    ctx.fillRect(food.x * CELL + 1, food.y * CELL + 1, CELL - 3, CELL - 3);
+    ctx.fillRect(food.x*CELL+1, food.y*CELL+1, CELL-3, CELL-3);
     ctx.fillStyle = '#5aaa5a';
-    ctx.fillRect(food.x * CELL + 2, food.y * CELL + 2, 3, 3);
+    ctx.fillRect(food.x*CELL+2, food.y*CELL+2, 3, 3);
 
-    // Snake (transparent when ghost active)
+    // Snake — semi-transparent when ghost active
     ctx.globalAlpha = ghostActive ? 0.38 : 1.0;
     snake.forEach((s, i) => {
         ctx.fillStyle = i === 0 ? '#1e6a1e' : '#0f380f';
-        ctx.fillRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 3, CELL - 3);
+        ctx.fillRect(s.x*CELL+1, s.y*CELL+1, CELL-3, CELL-3);
         if (i === 0) {
-            // Eyes on head
             ctx.fillStyle = ghostActive ? '#ccff44' : '#9bbc0f';
-            ctx.fillRect(s.x * CELL + 3, s.y * CELL + 3, 2, 2);
-            ctx.fillRect(s.x * CELL + 8, s.y * CELL + 3, 2, 2);
+            ctx.fillRect(s.x*CELL+3, s.y*CELL+3, 2, 2);
+            ctx.fillRect(s.x*CELL+8, s.y*CELL+3, 2, 2);
         }
     });
     ctx.globalAlpha = 1.0;
 
-    // HUD: active reward indicators (top-left of canvas)
+    // HUD — active reward indicators
     let hud = [];
+    if (extraLives > 0)
+        hud.push({ text: '\u2665'.repeat(extraLives), col: '#ff6666' });
     if (ghostActive && Date.now() < ghostEnd)
-        hud.push({ text: 'GHOST ' + Math.ceil((ghostEnd - Date.now()) / 1000) + 's', col: '#ccff44' });
+        hud.push({ text: 'GHOST '+Math.ceil((ghostEnd-Date.now())/1000)+'s', col: '#ccff44' });
+    if (obstPassActive && Date.now() < obstPassEnd)
+        hud.push({ text: 'PASS '+Math.ceil((obstPassEnd-Date.now())/1000)+'s', col: '#44aaff' });
     if (mult > 1.0 && Date.now() < multEnd)
-        hud.push({ text: mult + 'x ' + Math.ceil((multEnd - Date.now()) / 1000) + 's', col: '#ffcc44' });
-    if (wallMode && level >= 2)
-        hud.push({ text: 'WALLS', col: '#ff8844' });
+        hud.push({ text: mult+'x '+Math.ceil((multEnd-Date.now())/1000)+'s', col: '#ffcc44' });
 
     if (hud.length) {
-        let bw = 90, bh = hud.length * 14 + 6;
-        ctx.fillStyle = 'rgba(10,40,10,0.78)';
+        let bw = 92, bh = hud.length*14+6;
+        ctx.fillStyle = 'rgba(10,40,10,0.80)';
         ctx.fillRect(1, 1, bw, bh);
         ctx.font = '10px "Courier New"';
         ctx.textAlign = 'left';
-        hud.forEach((h, i) => {
-            ctx.fillStyle = h.col;
-            ctx.fillText(h.text, 4, 13 + i * 14);
-        });
+        hud.forEach((h, i) => { ctx.fillStyle = h.col; ctx.fillText(h.text, 4, 13+i*14); });
         ctx.textAlign = 'center';
     }
 }
 
 // ══════════════════════════════════════════════════════
-// LEVEL CLEAR SCREEN
+// LEVEL CLEAR
 // ══════════════════════════════════════════════════════
 function doLevelClear() {
     gState = 'levelClear';
     clearTimeout(loopTimer);
-
-    // Level bonus points
-    score  += LEVEL_BONUS;
-    coins  += LEVEL_BONUS;
-    updateUI();
-
     let elapsed = (Date.now() - levelStartTime) / 1000;
-    let grade   = getGrade(elapsed);
-    setPendingReward(grade);
+    lastGrade = getGrade(elapsed);
 
-    draw(); // show game state underneath overlay
+    if (lastGrade !== 'F') {
+        score += LEVEL_BONUS;
+        coins += LEVEL_BONUS;
+        updateUI();
+        setPendingReward(lastGrade);
+    }
 
-    ctx.fillStyle = 'rgba(15,56,15,0.90)';
-    ctx.fillRect(0, 0, 300, 300);
-    ctx.textAlign = 'center';
+    draw();
 
-    // Header
-    ctx.fillStyle = '#9bbc0f';
-    ctx.font = 'bold 15px "Courier New"';
-    ctx.fillText('LEVEL ' + level + ' CLEAR!', 150, 40);
+    if (lastGrade === 'F') {
+        // F = failure / too slow
+        ctx.fillStyle = 'rgba(20,4,4,0.93)';
+        ctx.fillRect(0, 0, 300, 300);
+        ctx.textAlign = 'center';
 
-    // Big grade letter
-    ctx.fillStyle = GRADE_COLORS[grade] || '#9bbc0f';
-    ctx.font = 'bold 62px "Courier New"';
-    ctx.fillText(grade, 150, 118);
+        ctx.fillStyle = GRADE_COLORS['F'];
+        ctx.font = 'bold 64px "Courier New"';
+        ctx.fillText('F', 150, 112);
 
-    // Stats
-    ctx.fillStyle = '#9bbc0f';
-    ctx.font = '11px "Courier New"';
-    ctx.fillText('TIME: ' + elapsed.toFixed(1) + 's', 150, 148);
-    ctx.fillText('SCORE: ' + score + '  \u00A2' + coins, 150, 164);
+        ctx.font = 'bold 14px "Courier New"';
+        ctx.fillText('TOO SLOW!', 150, 142);
 
-    // Reward
-    ctx.font = 'bold 12px "Courier New"';
-    ctx.fillStyle = GRADE_COLORS[grade] || '#9bbc0f';
-    ctx.fillText('REWARD \u203A ' + rewardLabel(grade), 150, 190);
-    ctx.font = '10px "Courier New"';
-    ctx.fillStyle = '#7a9c4a';
-    ctx.fillText(rewardDesc(grade), 150, 206);
+        ctx.font = '11px "Courier New"';
+        ctx.fillStyle = '#9bbc0f';
+        ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 166);
+        ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 182);
 
-    // Continue prompt
-    ctx.fillStyle = '#9bbc0f';
-    ctx.font = '10px "Courier New"';
-    ctx.fillText(
-        level < 100 ? 'START \u203A level ' + (level + 1) : 'START \u203A FINAL CLEAR!',
-        150, 250
-    );
+        if (extraLives > 0) {
+            ctx.fillStyle = '#ff6666';
+            ctx.font = 'bold 11px "Courier New"';
+            ctx.fillText('\u2665 USE LIFE \u2192 continue to lv '+(level+1), 150, 212);
+            ctx.fillStyle = '#9bbc0f';
+            ctx.font = '10px "Courier New"';
+            ctx.fillText('('+extraLives+' '+(extraLives===1?'life':'lives')+' remaining)', 150, 226);
+        } else {
+            ctx.fillStyle = '#cc3322';
+            ctx.font = 'bold 12px "Courier New"';
+            ctx.fillText('ELIMINATED', 150, 212);
+            ctx.fillStyle = '#9bbc0f';
+            ctx.font = '10px "Courier New"';
+            ctx.fillText('no lives left \u2014 game resets', 150, 226);
+        }
+        ctx.fillStyle = '#9bbc0f';
+        ctx.fillText('press START', 150, 258);
+
+    } else {
+        // Normal grade screen
+        ctx.fillStyle = 'rgba(15,56,15,0.91)';
+        ctx.fillRect(0, 0, 300, 300);
+        ctx.textAlign = 'center';
+
+        ctx.fillStyle = '#9bbc0f';
+        ctx.font = 'bold 15px "Courier New"';
+        ctx.fillText('LEVEL '+level+' CLEAR!', 150, 40);
+
+        ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
+        ctx.font = 'bold 62px "Courier New"';
+        ctx.fillText(lastGrade, 150, 118);
+
+        ctx.fillStyle = '#9bbc0f';
+        ctx.font = '11px "Courier New"';
+        ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 148);
+        ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 164);
+
+        ctx.font = 'bold 12px "Courier New"';
+        ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
+        ctx.fillText('REWARD \u203A '+rewardLabel(lastGrade), 150, 190);
+
+        ctx.font = '10px "Courier New"';
+        ctx.fillStyle = '#7a9c4a';
+        ctx.fillText(rewardDesc(lastGrade), 150, 206);
+
+        ctx.fillStyle = '#9bbc0f';
+        ctx.fillText(level < 100 ? 'START \u203A level '+(level+1) : 'START \u203A FINAL!', 150, 250);
+    }
 }
 
 // ══════════════════════════════════════════════════════
-// GAME OVER SCREEN
+// MID-LEVEL DEATH (self or obstacle collision)
 // ══════════════════════════════════════════════════════
 function doGameOver() {
+    if (extraLives > 0) { doRespawn(); return; }
     gState = 'gameOver';
     clearTimeout(loopTimer);
-
     draw();
     ctx.fillStyle = 'rgba(15,56,15,0.82)';
     ctx.fillRect(0, 0, 300, 300);
     ctx.fillStyle = '#9bbc0f';
     ctx.textAlign = 'center';
-
     ctx.font = 'bold 22px "Courier New"';
     ctx.fillText('GAME OVER', 150, 108);
-
     ctx.font = '13px "Courier New"';
-    ctx.fillText('LV ' + level + '  SCORE ' + score, 150, 142);
-    ctx.fillText('\u00A2' + coins + ' COINS EARNED', 150, 162);
-
+    ctx.fillText('LV '+level+'  SCORE '+score, 150, 142);
+    ctx.fillText('\u00A2'+coins+' COINS', 150, 162);
     ctx.font = '11px "Courier New"';
     ctx.fillText('press START to retry', 150, 210);
 }
 
 // ══════════════════════════════════════════════════════
-// WIN SCREEN (level 100 cleared)
+// RESPAWN (extra life consumed on mid-level death)
+// ══════════════════════════════════════════════════════
+function doRespawn() {
+    extraLives--;
+    gState = 'respawning';
+    clearTimeout(loopTimer);
+    snake = [{x:10, y:10}]; dx = 0; dy = 0;
+    draw();
+    ctx.fillStyle = 'rgba(15,56,15,0.80)';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff6666';
+    ctx.font = 'bold 20px "Courier New"';
+    ctx.fillText('EXTRA LIFE!', 150, 128);
+    ctx.font = '12px "Courier New"';
+    ctx.fillStyle = '#9bbc0f';
+    ctx.fillText('\u2665 '+extraLives+' remaining', 150, 156);
+    setTimeout(() => {
+        if (gState === 'respawning') { gState = 'playing'; loop(); }
+    }, 1500);
+}
+
+// ══════════════════════════════════════════════════════
+// WIN
 // ══════════════════════════════════════════════════════
 function drawWin() {
     gState = 'win';
     clearTimeout(loopTimer);
-
     ctx.fillStyle = '#071c07';
     ctx.fillRect(0, 0, 300, 300);
     ctx.textAlign = 'center';
-
     ctx.fillStyle = '#ffff44';
     ctx.font = 'bold 22px "Courier New"';
     ctx.fillText('YOU WIN!', 150, 92);
-
     ctx.font = '12px "Courier New"';
     ctx.fillStyle = '#9bbc0f';
     ctx.fillText('100 LEVELS COMPLETE', 150, 122);
-    ctx.fillText('FINAL SCORE: ' + score, 150, 146);
-    ctx.fillText('\u00A2' + coins + ' COINS EARNED', 150, 166);
-
+    ctx.fillText('FINAL SCORE: '+score, 150, 146);
+    ctx.fillText('\u00A2'+coins+' COINS EARNED', 150, 166);
     ctx.font = '11px "Courier New"';
     ctx.fillText('press START to play again', 150, 220);
 }
 
 // ══════════════════════════════════════════════════════
-// IDLE / WELCOME SCREEN
+// IDLE / WELCOME
 // ══════════════════════════════════════════════════════
 function drawIdle() {
     ctx.fillStyle = '#8bac0f';
     ctx.fillRect(0, 0, 300, 300);
     ctx.fillStyle = '#0f380f';
     ctx.textAlign = 'center';
-
     ctx.font = 'bold 20px "Courier New"';
-    ctx.fillText('SNAKE EVO', 150, 88);
-
+    ctx.fillText('SNAKE EVO', 150, 78);
     ctx.font = '11px "Courier New"';
-    ctx.fillText('press START to play', 150, 128);
-    ctx.fillText('walls wrap \u2022 earn rewards', 150, 148);
-    ctx.fillText('reach level 100!', 150, 168);
-
+    ctx.fillText('wrap walls \u2022 obstacles from lv2', 150, 112);
+    ctx.fillText('eat 16 prey to clear each level', 150, 128);
     ctx.font = '10px "Courier New"';
     ctx.fillStyle = '#306230';
-    ctx.fillText('S=ghost  A=walls  B-D=score\u00D7', 150, 200);
-    ctx.fillText('grade how fast you clear each level', 150, 216);
+    ctx.fillText('S=\u2665life  A=ghost  B=pass walls', 150, 162);
+    ctx.fillText('C=score\u00d7  D=spd hold  E=+coins', 150, 176);
+    ctx.fillText('F = GAME OVER (spend \u2665 to survive)', 150, 190);
+    ctx.fillStyle = '#0f380f';
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('press START to play', 150, 238);
 }
 
 // ══════════════════════════════════════════════════════
-// GAME UPDATE
+// UPDATE
 // ══════════════════════════════════════════════════════
 function update() {
     if (gState !== 'playing') return;
-
-    // No direction pressed yet — just redraw
     if (dx === 0 && dy === 0) { draw(); return; }
 
     // Expire rewards
-    if (ghostActive && Date.now() > ghostEnd) ghostActive = false;
-    if (mult > 1    && Date.now() > multEnd)  mult = 1.0;
+    if (ghostActive    && Date.now() > ghostEnd)    ghostActive    = false;
+    if (obstPassActive && Date.now() > obstPassEnd) obstPassActive = false;
+    if (mult > 1       && Date.now() > multEnd)     mult           = 1.0;
 
-    // Grow obstacle wall periodically
-    if (wallMode && obstacles.length > 0 && Date.now() >= wallGrowAt) {
-        growObstacle();
-        wallGrowAt = Date.now() + 15000;
+    // Evolve obstacles from level 10 only
+    if (level >= 10 && wallEvolveAt > 0 && Date.now() >= wallEvolveAt) {
+        evolveObstacles();
     }
 
-    // New head — WRAP through walls (all levels, all boundaries)
+    // New head — wrap through all 4 boundaries
     let head = {
         x: (snake[0].x + dx + COLS) % COLS,
         y: (snake[0].y + dy + ROWS) % ROWS
     };
 
-    // Self collision — death UNLESS ghost mode is active
-    // Check all segments except the tail (which moves away this tick)
-    if (!ghostActive) {
-        let body = snake.slice(0, snake.length - 1);
-        if (body.some(s => s.x === head.x && s.y === head.y)) {
-            doGameOver(); return;
-        }
+    // Self collision — only lethal without ghost
+    if (!ghostActive && snake.slice(0, -1).some(s => s.x===head.x && s.y===head.y)) {
+        doGameOver(); return;
     }
 
-    // Obstacle wall collision — always lethal
-    if (obstacles.some(o => o.x === head.x && o.y === head.y)) {
+    // Obstacle collision — only lethal without obstacle pass
+    if (!obstPassActive && obstacles.some(o => o.x===head.x && o.y===head.y)) {
         doGameOver(); return;
     }
 
@@ -752,12 +805,9 @@ function update() {
     if (head.x === food.x && head.y === food.y) {
         let pts = Math.round(PREY_PTS * mult);
         let cts = Math.round(PREY_COINS * mult);
-        score  += pts;
-        coins  += cts;
-        preyEaten++;
+        score += pts; coins += cts; preyEaten++;
         food = spawnFood();
         updateUI();
-
         if (preyEaten >= PREY_PER_LEVEL) { doLevelClear(); return; }
     } else {
         snake.pop();
@@ -767,7 +817,7 @@ function update() {
 }
 
 // ══════════════════════════════════════════════════════
-// GAME LOOP
+// LOOP
 // ══════════════════════════════════════════════════════
 function loop() {
     update();
@@ -775,23 +825,23 @@ function loop() {
 }
 
 // ══════════════════════════════════════════════════════
-// BEGIN LEVEL (called after reset or level advance)
+// BEGIN LEVEL
 // ══════════════════════════════════════════════════════
 function beginLevel() {
-    snake = [{x: 10, y: 10}];
-    dx = 0; dy = 0;
-    preyEaten = 0;
-    obstacles = [];
+    snake = [{x:10, y:10}]; dx = 0; dy = 0;
+    preyEaten = 0; obstacles = [];
 
     activatePending();
 
-    speed = calcSpeed(level);
-    if (easyNext) { speed = Math.min(speed + 60, 280); easyNext = false; }
+    let natural = calcSpeed(level);
+    if (speedHold) { speed = currentLevelSpeed; speedHold = false; }
+    else           { speed = natural; }
+    currentLevelSpeed = speed;
 
-    if (wallMode && level >= 2) {
-        spawnObstacles();
-        wallGrowAt = Date.now() + 15000;
-    }
+    spawnObstacles();
+
+    // Obstacle evolution only from level 10 (30s initial interval)
+    wallEvolveAt = (level >= 10 && obstacles.length > 0) ? Date.now() + 30000 : 0;
 
     food = spawnFood();
     levelStartTime = Date.now();
@@ -801,40 +851,66 @@ function beginLevel() {
 }
 
 // ══════════════════════════════════════════════════════
-// RESET (full game reset)
+// RESET
 // ══════════════════════════════════════════════════════
 function resetGame() {
     clearTimeout(loopTimer);
     score = 0; level = 1; coins = 0; preyEaten = 0;
-    ghostActive = false; mult = 1.0;
-    wallMode = false; easyNext = false;
-    pendingReward = null; obstacles = [];
+    extraLives = 0; ghostActive = false; obstPassActive = false;
+    mult = 1.0; speedHold = false;
+    currentLevelSpeed = calcSpeed(1);
+    pendingReward = null; obstacles = []; lastGrade = null;
     updateUI();
 }
 
 // ══════════════════════════════════════════════════════
-// START BUTTON LOGIC
+// START BUTTON
 // ══════════════════════════════════════════════════════
 function startGame() {
-    if (gState === 'idle' || gState === 'gameOver' || gState === 'win') {
-        resetGame();
-        beginLevel();
-    } else if (gState === 'levelClear') {
-        if (level >= 100) { drawWin(); return; }
-        level++;
-        beginLevel();
+    if (gState==='idle' || gState==='gameOver' || gState==='win') {
+        resetGame(); beginLevel();
+    } else if (gState==='levelClear') {
+        if (lastGrade==='F') {
+            if (extraLives > 0) {
+                // Spend a life to survive F grade
+                extraLives--;
+                level++;
+                beginLevel();
+            } else {
+                // True elimination
+                let lv=level, sc=score, co=coins;
+                resetGame();
+                gState = 'gameOver';
+                ctx.fillStyle = '#0a0404';
+                ctx.fillRect(0, 0, 300, 300);
+                ctx.textAlign = 'center';
+                ctx.fillStyle = GRADE_COLORS['F'];
+                ctx.font = 'bold 42px "Courier New"';
+                ctx.fillText('F', 150, 88);
+                ctx.font = 'bold 16px "Courier New"';
+                ctx.fillStyle = '#cc3322';
+                ctx.fillText('ELIMINATED', 150, 120);
+                ctx.font = '11px "Courier New"';
+                ctx.fillStyle = '#9bbc0f';
+                ctx.fillText('LV '+lv+'  SCORE '+sc+'  \u00A2'+co, 150, 152);
+                ctx.fillText('press START to try again', 150, 210);
+            }
+        } else {
+            if (level >= 100) { drawWin(); return; }
+            level++;
+            beginLevel();
+        }
     }
-    // playing/paused: do nothing (use menu)
 }
 
 // ══════════════════════════════════════════════════════
-// DIRECTION INPUT
+// DIRECTION
 // ══════════════════════════════════════════════════════
 function setDir(dir) {
-    if (dir === 'up'    && dy === 0) { dx = 0;  dy = -1; }
-    if (dir === 'down'  && dy === 0) { dx = 0;  dy = 1;  }
-    if (dir === 'left'  && dx === 0) { dx = -1; dy = 0;  }
-    if (dir === 'right' && dx === 0) { dx = 1;  dy = 0;  }
+    if (dir==='up'    && dy===0) {dx=0; dy=-1;}
+    if (dir==='down'  && dy===0) {dx=0; dy=1;}
+    if (dir==='left'  && dx===0) {dx=-1; dy=0;}
+    if (dir==='right' && dx===0) {dx=1; dy=0;}
 }
 
 // ══════════════════════════════════════════════════════
@@ -842,8 +918,7 @@ function setDir(dir) {
 // ══════════════════════════════════════════════════════
 function boost() {
     if (gState !== 'playing') return;
-    let prev = speed;
-    speed = 50;
+    let prev = speed; speed = 50;
     setTimeout(() => { speed = prev; }, 1000);
 }
 
@@ -851,90 +926,78 @@ function boost() {
 // MENU
 // ══════════════════════════════════════════════════════
 function openMenu() {
-    if (gState === 'levelClear') return;
-    if (gState === 'playing') { gState = 'paused'; clearTimeout(loopTimer); }
+    if (gState==='levelClear' || gState==='respawning') return;
+    if (gState==='playing') { gState='paused'; clearTimeout(loopTimer); }
     document.getElementById('menuOverlay').classList.add('open');
-    document.getElementById('mainMenu').style.display = '';
+    document.getElementById('mainMenu').style.display='';
     document.getElementById('dpadPanel').classList.remove('open');
 }
 
-function closeMenu() {
-    document.getElementById('menuOverlay').classList.remove('open');
-}
+function closeMenu() { document.getElementById('menuOverlay').classList.remove('open'); }
 
 function menuPlay() {
     closeMenu();
-    if (gState === 'idle' || gState === 'gameOver' || gState === 'win') {
-        resetGame(); beginLevel();
-    } else if (gState === 'paused') {
-        gState = 'playing'; loop();
-    }
+    if (gState==='idle'||gState==='gameOver'||gState==='win') { resetGame(); beginLevel(); }
+    else if (gState==='paused') { gState='playing'; loop(); }
 }
 
 function menuPause() {
-    if (gState === 'playing') { gState = 'paused'; clearTimeout(loopTimer); }
+    if (gState==='playing') { gState='paused'; clearTimeout(loopTimer); }
     closeMenu();
 }
 
-function menuRestart() {
-    closeMenu();
-    resetGame();
-    beginLevel();
-}
+function menuRestart() { closeMenu(); resetGame(); beginLevel(); }
 
 // ══════════════════════════════════════════════════════
-// D-PAD PANEL
+// D-PAD
 // ══════════════════════════════════════════════════════
 function openDpadPanel() {
-    document.getElementById('mainMenu').style.display = 'none';
+    document.getElementById('mainMenu').style.display='none';
     document.getElementById('dpadPanel').classList.add('open');
 }
 
 function closeDpadPanel() {
-    document.getElementById('mainMenu').style.display = '';
+    document.getElementById('mainMenu').style.display='';
     document.getElementById('dpadPanel').classList.remove('open');
 }
 
-const dpadSizes = { S:40, M:60, L:80 };
+const dpadSizes = {S:40, M:60, L:80};
 
 function setDpadSize(s) {
     let px = dpadSizes[s];
     let dpad = document.getElementById('dpad');
     dpad.style.gridTemplateColumns = px+'px '+px+'px '+px+'px';
     dpad.style.gridTemplateRows    = px+'px '+px+'px '+px+'px';
-    document.querySelectorAll('.dpadBtn').forEach(b => { b.style.fontSize = (px * 0.35) + 'px'; });
-    ['S','M','L'].forEach(k => document.getElementById('size'+k).classList.toggle('active', k === s));
+    document.querySelectorAll('.dpadBtn').forEach(b => { b.style.fontSize=(px*0.35)+'px'; });
+    ['S','M','L'].forEach(k => document.getElementById('size'+k).classList.toggle('active', k===s));
 }
 
 function setDpadPos(val) {
-    document.getElementById('dpadWrap').style.marginLeft = val + 'px';
-    let lbl = document.getElementById('posLabel');
-    lbl.innerText = val == 0 ? 'CENTER' : val < 0 ? 'LEFT '+Math.abs(val)+'px' : 'RIGHT '+val+'px';
+    document.getElementById('dpadWrap').style.marginLeft = val+'px';
+    let l = document.getElementById('posLabel');
+    l.innerText = val==0 ? 'CENTER' : val<0 ? 'LEFT '+Math.abs(val)+'px' : 'RIGHT '+val+'px';
 }
 
 // ══════════════════════════════════════════════════════
 // KEYBOARD
 // ══════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
-    if (e.key === 'ArrowUp'    || e.key === 'w') { e.preventDefault(); setDir('up');    }
-    if (e.key === 'ArrowDown'  || e.key === 's') { e.preventDefault(); setDir('down');  }
-    if (e.key === 'ArrowLeft'  || e.key === 'a') { e.preventDefault(); setDir('left');  }
-    if (e.key === 'ArrowRight' || e.key === 'd') { e.preventDefault(); setDir('right'); }
-    if (e.key === 'Enter' || e.key === ' ')      { e.preventDefault(); startGame();     }
+    if (e.key==='ArrowUp'   ||e.key==='w'){e.preventDefault();setDir('up');}
+    if (e.key==='ArrowDown' ||e.key==='s'){e.preventDefault();setDir('down');}
+    if (e.key==='ArrowLeft' ||e.key==='a'){e.preventDefault();setDir('left');}
+    if (e.key==='ArrowRight'||e.key==='d'){e.preventDefault();setDir('right');}
+    if (e.key==='Enter'||e.key===' ')    {e.preventDefault();startGame();}
 });
 
 // ══════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════
 setDpadSize('M');
-// Bootstrap safe defaults so spawnFood/draw can run
-snake = [{x:10, y:10}];
-food  = {x:5, y:5};
-dx = 0; dy = 0;
-score = 0; level = 1; coins = 0; preyEaten = 0;
-ghostActive = false; mult = 1.0;
-wallMode = false; easyNext = false;
-obstacles = []; pendingReward = null;
+snake=[{x:10,y:10}]; food={x:5,y:5}; dx=0; dy=0;
+score=0; level=1; coins=0; preyEaten=0;
+extraLives=0; ghostActive=false; obstPassActive=false;
+mult=1.0; speedHold=false; obstacles=[]; pendingReward=null;
+currentLevelSpeed=calcSpeed(1); lastGrade=null;
 updateUI();
 drawIdle();
 </script>
