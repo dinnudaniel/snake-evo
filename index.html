@@ -1029,7 +1029,8 @@ function draw() {
         ctx.lineCap = 'round';
         ctx.beginPath();
         snake.forEach((s, i) => {
-            i === 0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+            const wrapped = i > 0 && (Math.abs(s.x-snake[i-1].x) > 1 || Math.abs(s.y-snake[i-1].y) > 1);
+            (i === 0 || wrapped) ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
         });
         ctx.stroke();
 
@@ -1038,7 +1039,8 @@ function draw() {
         ctx.lineWidth = bw;
         ctx.beginPath();
         snake.forEach((s, i) => {
-            i === 0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+            const wrapped = i > 0 && (Math.abs(s.x-snake[i-1].x) > 1 || Math.abs(s.y-snake[i-1].y) > 1);
+            (i === 0 || wrapped) ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
         });
         ctx.stroke();
 
@@ -1047,7 +1049,8 @@ function draw() {
         ctx.lineWidth = Math.max(2, bw - 7);
         ctx.beginPath();
         snake.forEach((s, i) => {
-            i === 0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+            const wrapped = i > 0 && (Math.abs(s.x-snake[i-1].x) > 1 || Math.abs(s.y-snake[i-1].y) > 1);
+            (i === 0 || wrapped) ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
         });
         ctx.stroke();
 
