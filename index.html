@@ -514,7 +514,7 @@ canvas{
         <div class="info">
             <span>HIGH SCORE <span id="highscore">0</span></span>
             <span>PREY <span id="prey">0</span>/16</span>
-            <span>&#162;<span id="coins">0</span></span>
+            <span>COIN <span id="coins">0</span></span>
         </div>
 
         <!-- TUTORIAL OVERLAY -->
@@ -528,7 +528,7 @@ canvas{
                 </div>
                 <div class="tutRow">
                     <span class="tutIcon">F</span>
-                    <span>Each food = 10 points. Eat more to grow and level up. <span class="tutBadge">+10pts</span></span>
+                    <span>Each food = 5 points &amp; 5 coins. Eat more to grow and level up. <span class="tutBadge">+5pts</span></span>
                 </div>
                 <div class="tutRow">
                     <span class="tutIcon">X</span>
@@ -669,8 +669,8 @@ const ctx    = canvas.getContext('2d');
 
 const COLS = 20, ROWS = 20, CELL = 15;
 const PREY_PER_LEVEL = 16;
-const PREY_PTS        = 10; // score: 10 points per prey
-const PREY_COINS      = 5;  // coins: 5 per prey (unchanged)
+const PREY_PTS        = 5;  // score: 5 points per prey
+const PREY_COINS      = 5;  // coins: 5 per prey
 const LEVEL_BONUS_PTS  = 1;  // +1 score on level clear
 const LEVEL_BONUS_COINS= 5;  // +5 coins on level clear
 
@@ -1053,7 +1053,7 @@ function doLevelClear() {
     ctx.fillStyle = '#9bbc0f';
     ctx.font = '11px "Courier New"';
     ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 148);
-    ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 164);
+    ctx.fillText('SCORE: '+score+'  COIN '+coins, 150, 164);
 
     ctx.font = 'bold 12px "Courier New"';
     ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
@@ -1084,7 +1084,7 @@ function doGameOver() {
     ctx.fillText('GAME OVER', 150, 108);
     ctx.font = '13px "Courier New"';
     ctx.fillText('LV '+level+'  SCORE '+score, 150, 142);
-    ctx.fillText('\u00A2'+coins+' COINS', 150, 162);
+    ctx.fillText('COINS: '+coins, 150, 162);
     ctx.font = '11px "Courier New"';
     ctx.fillText('press START to retry', 150, 210);
 }
@@ -1129,7 +1129,7 @@ function drawWin() {
     ctx.fillStyle = '#9bbc0f';
     ctx.fillText('100 LEVELS COMPLETE', 150, 122);
     ctx.fillText('FINAL SCORE: '+score, 150, 146);
-    ctx.fillText('\u00A2'+coins+' COINS EARNED', 150, 166);
+    ctx.fillText('COINS EARNED: '+coins, 150, 166);
     ctx.font = '11px "Courier New"';
     ctx.fillText('press START to play again', 150, 220);
 }
