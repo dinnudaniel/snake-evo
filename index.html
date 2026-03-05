@@ -54,8 +54,194 @@ canvas{
     display:flex;
     justify-content:space-between;
     font-size:11px;
+    font-weight:bold;
     margin-top:5px;
     padding:0 2px;
+}
+
+/* ── TUTORIAL OVERLAY ── */
+#tutorialOverlay{
+    display:none;
+    position:absolute;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(10,40,10,0.97);
+    color:#9bbc0f;
+    flex-direction:column;
+    align-items:stretch;
+    justify-content:center;
+    z-index:20;
+    border-radius:6px;
+    padding:10px 14px;
+    box-sizing:border-box;
+}
+#tutorialOverlay.open{ display:flex; }
+
+.tutPage{ display:flex; flex-direction:column; gap:7px; }
+
+.tutPageTitle{
+    font-size:16px;
+    font-weight:bold;
+    letter-spacing:3px;
+    color:#ffff44;
+    text-align:center;
+    border-bottom:2px solid #9bbc0f;
+    padding-bottom:6px;
+    margin-bottom:2px;
+}
+
+.tutRow{
+    display:flex;
+    align-items:flex-start;
+    gap:9px;
+    font-size:11px;
+    font-weight:bold;
+    line-height:1.35;
+    color:#c8e070;
+}
+
+.tutIcon{
+    font-size:15px;
+    font-weight:bold;
+    min-width:24px;
+    text-align:center;
+    background:#0f380f;
+    border:2px solid #9bbc0f;
+    border-radius:3px;
+    padding:1px 3px;
+    color:#ffff44;
+    flex-shrink:0;
+}
+.tutIcon.S{ color:#ffff44; border-color:#ffff44; }
+.tutIcon.A{ color:#88ff88; border-color:#88ff88; }
+.tutIcon.B{ color:#44aaff; border-color:#44aaff; }
+.tutIcon.C{ color:#ffaa44; border-color:#ffaa44; }
+.tutIcon.D{ color:#ff8844; border-color:#ff8844; }
+.tutIcon.E{ color:#aabbaa; border-color:#aabbaa; }
+.tutIcon.F{ color:#cc3322; border-color:#cc3322; }
+
+.tutNav{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:8px;
+    padding-top:6px;
+    border-top:1px solid #306230;
+}
+.tutNav span{
+    font-size:10px;
+    color:#6a8a4a;
+    cursor:pointer;
+    text-decoration:underline;
+}
+.tutNav button{
+    background:#9bbc0f;
+    border:none;
+    color:#0f380f;
+    font-family:"Courier New",monospace;
+    font-size:12px;
+    font-weight:bold;
+    padding:5px 14px;
+    border-radius:4px;
+    cursor:pointer;
+}
+
+/* ── REGISTRATION OVERLAY ── */
+#registerOverlay{
+    display:none;
+    position:absolute;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(10,40,10,0.97);
+    color:#9bbc0f;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    z-index:20;
+    border-radius:6px;
+    padding:20px 16px;
+    box-sizing:border-box;
+}
+#registerOverlay.open{ display:flex; }
+
+.regTitle{
+    font-size:16px;
+    font-weight:bold;
+    letter-spacing:3px;
+    color:#ffff44;
+    text-align:center;
+    border-bottom:2px solid #9bbc0f;
+    padding-bottom:8px;
+    width:100%;
+}
+.regSub{
+    font-size:11px;
+    font-weight:bold;
+    color:#c8e070;
+    text-align:center;
+    margin:0;
+}
+#regName{
+    background:#0f380f;
+    border:2px solid #9bbc0f;
+    color:#9bbc0f;
+    font-family:"Courier New",monospace;
+    font-size:15px;
+    font-weight:bold;
+    padding:8px 12px;
+    border-radius:4px;
+    width:100%;
+    box-sizing:border-box;
+    text-align:center;
+    text-transform:uppercase;
+}
+#regName::placeholder{ color:#306230; }
+.regBtn{
+    background:#9bbc0f;
+    border:none;
+    color:#0f380f;
+    font-family:"Courier New",monospace;
+    font-size:13px;
+    font-weight:bold;
+    padding:9px 0;
+    border-radius:4px;
+    cursor:pointer;
+    width:100%;
+    letter-spacing:2px;
+}
+.guestLink{
+    font-size:10px;
+    color:#6a8a4a;
+    cursor:pointer;
+    text-decoration:underline;
+}
+
+/* ── STATS BAR ── */
+.statsBar{
+    width:360px;
+    margin:10px auto 0;
+    display:flex;
+    justify-content:space-around;
+    text-align:center;
+    font-family:"Courier New",monospace;
+}
+.statCol{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+}
+.statVal{
+    font-size:18px;
+    font-weight:bold;
+    color:#9bbc0f;
+}
+.statLabel{
+    font-size:8px;
+    color:#5a6a7a;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    line-height:1.2;
+    max-width:110px;
 }
 
 /* ── MENU OVERLAY ── */
@@ -260,9 +446,61 @@ canvas{
         <canvas id="game" width="300" height="300"></canvas>
 
         <div class="info">
-            <span>LV<span id="level">1</span></span>
+            <span>HIGH SCORE <span id="highscore">0</span></span>
             <span>PREY <span id="prey">0</span>/16</span>
             <span>&#162;<span id="coins">0</span></span>
+        </div>
+
+        <!-- TUTORIAL OVERLAY -->
+        <div id="tutorialOverlay">
+            <!-- Page 0: HOW TO PLAY -->
+            <div id="tutPage0" class="tutPage">
+                <div class="tutPageTitle">HOW TO PLAY</div>
+                <div class="tutRow">
+                    <span class="tutIcon">D</span>
+                    <span>Use the D-PAD to steer your snake. Do not hit walls or yourself!</span>
+                </div>
+                <div class="tutRow">
+                    <span class="tutIcon">F</span>
+                    <span>Each food = 5 pts &amp; 5 coins. Eat 16 prey to clear the level.</span>
+                </div>
+                <div class="tutRow">
+                    <span class="tutIcon">X</span>
+                    <span>Hit a wall or yourself = GAME OVER. Walls wrap around all sides.</span>
+                </div>
+                <div class="tutRow">
+                    <span class="tutIcon">&#9679;</span>
+                    <span>Tap the center button for a 1-second BOOST of speed!</span>
+                </div>
+                <div class="tutNav">
+                    <span onclick="skipTutorial()">SKIP</span>
+                    <button onclick="nextTutPage()">NEXT &gt;</button>
+                </div>
+            </div>
+            <!-- Page 1: REWARDS -->
+            <div id="tutPage1" class="tutPage" style="display:none">
+                <div class="tutPageTitle">GRADE REWARDS</div>
+                <div class="tutRow"><span class="tutIcon S">S</span><span>Extra life stored (max 3) — fastest clear</span></div>
+                <div class="tutRow"><span class="tutIcon A">A</span><span>Ghost mode: pass through your own body</span></div>
+                <div class="tutRow"><span class="tutIcon B">B</span><span>Obstacle pass: go through wall blocks</span></div>
+                <div class="tutRow"><span class="tutIcon C">C</span><span>Score ×1.5 multiplier for next level</span></div>
+                <div class="tutRow"><span class="tutIcon D">D</span><span>Speed hold: keep current speed next level</span></div>
+                <div class="tutRow"><span class="tutIcon E">E</span><span>+5 bonus coins for effort</span></div>
+                <div class="tutRow"><span class="tutIcon F">F</span><span>TOO SLOW — game resets (spend ♥ to survive)</span></div>
+                <div class="tutNav">
+                    <span onclick="skipTutorial()">SKIP</span>
+                    <button onclick="nextTutPage()">REGISTER &gt;</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- REGISTRATION OVERLAY -->
+        <div id="registerOverlay">
+            <div class="regTitle">JOIN THE GAME</div>
+            <p class="regSub">Enter your name to register as a player</p>
+            <input id="regName" type="text" placeholder="YOUR NAME" maxlength="12">
+            <button class="regBtn" onclick="submitRegistration()">&#9654; REGISTER</button>
+            <span class="guestLink" onclick="skipRegistration()">Play as guest (no registration)</span>
         </div>
 
         <!-- MENU OVERLAY -->
@@ -333,6 +571,22 @@ canvas{
 
 </div>
 
+<!-- STATS BAR BELOW DEVICE -->
+<div class="statsBar">
+    <div class="statCol">
+        <span class="statVal" id="statReg">0</span>
+        <span class="statLabel">Registered Players</span>
+    </div>
+    <div class="statCol">
+        <span class="statVal" id="statActive">0</span>
+        <span class="statLabel">Active Now</span>
+    </div>
+    <div class="statCol">
+        <span class="statVal" id="statBest">—</span>
+        <span class="statLabel">Highest Score<br>in the Game</span>
+    </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════
 // SNAKE EVO — Full Engine v3
@@ -363,8 +617,102 @@ const GRADE_COLORS = {
     C:'#ffaa44', D:'#ff8844', E:'#aabbaa', F:'#cc3322'
 };
 
+// ══════════════════════════════════════════════════════
+// STORAGE (localStorage)
+// ══════════════════════════════════════════════════════
+function getRegistered()  { return JSON.parse(localStorage.getItem('snakeevo_reg') || '[]'); }
+function getHighScore()   { return parseInt(localStorage.getItem('snakeevo_hs') || '0'); }
+function getPlayerName()  { return localStorage.getItem('snakeevo_name') || ''; }
+function getTutSeen()     { return !!localStorage.getItem('snakeevo_tutseen'); }
+
+function saveHighScore(s) {
+    if (s > getHighScore()) {
+        localStorage.setItem('snakeevo_hs', s);
+        updateStatsBar();
+    }
+}
+
+function saveRegistration(name) {
+    let regs = getRegistered();
+    if (name && !regs.includes(name)) regs.push(name);
+    localStorage.setItem('snakeevo_reg', JSON.stringify(regs));
+    localStorage.setItem('snakeevo_name', name);
+}
+
+function updateStatsBar() {
+    let regs = getRegistered();
+    let hs   = getHighScore();
+    document.getElementById('statReg').innerText    = regs.length;
+    document.getElementById('statActive').innerText = sessionActive ? 1 : 0;
+    document.getElementById('statBest').innerText   = hs || '—';
+}
+
+let sessionActive = false;
+
+// ══════════════════════════════════════════════════════
+// TUTORIAL
+// ══════════════════════════════════════════════════════
+let tutorialPage = 0;
+const TUTORIAL_PAGES = 2;
+
+function showTutorial() {
+    gState = 'tutorial';
+    tutorialPage = 0;
+    document.getElementById('tutPage0').style.display = 'flex';
+    document.getElementById('tutPage1').style.display = 'none';
+    document.getElementById('tutorialOverlay').classList.add('open');
+}
+
+function nextTutPage() {
+    tutorialPage++;
+    if (tutorialPage >= TUTORIAL_PAGES) {
+        document.getElementById('tutorialOverlay').classList.remove('open');
+        if (!getPlayerName()) showRegister();
+        else startActualGame();
+    } else {
+        document.getElementById('tutPage0').style.display = tutorialPage === 0 ? 'flex' : 'none';
+        document.getElementById('tutPage1').style.display = tutorialPage === 1 ? 'flex' : 'none';
+    }
+}
+
+function skipTutorial() {
+    document.getElementById('tutorialOverlay').classList.remove('open');
+    if (!getPlayerName()) showRegister();
+    else startActualGame();
+}
+
+// ══════════════════════════════════════════════════════
+// REGISTRATION
+// ══════════════════════════════════════════════════════
+function showRegister() {
+    gState = 'register';
+    document.getElementById('registerOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('regName').focus(), 100);
+}
+
+function submitRegistration() {
+    let name = document.getElementById('regName').value.trim().toUpperCase();
+    if (name.length < 2) { alert('Please enter at least 2 characters'); return; }
+    saveRegistration(name);
+    document.getElementById('registerOverlay').classList.remove('open');
+    updateStatsBar();
+    startActualGame();
+}
+
+function skipRegistration() {
+    document.getElementById('registerOverlay').classList.remove('open');
+    startActualGame();
+}
+
+function startActualGame() {
+    sessionActive = true;
+    updateStatsBar();
+    resetGame();
+    beginLevel();
+}
+
 // ── State ──────────────────────────────────────────────
-// idle | playing | paused | respawning | levelClear | gameOver | win
+// idle | tutorial | register | playing | paused | respawning | levelClear | gameOver | win
 let gState = 'idle';
 let snake, food, dx, dy;
 let score, level, coins, preyEaten;
@@ -526,9 +874,10 @@ function activatePending() {
 // UI
 // ══════════════════════════════════════════════════════
 function updateUI() {
-    document.getElementById('level').innerText = level;
-    document.getElementById('prey').innerText  = preyEaten;
-    document.getElementById('coins').innerText = coins;
+    document.getElementById('prey').innerText      = preyEaten;
+    document.getElementById('coins').innerText     = coins;
+    let hs = Math.max(getHighScore(), score);
+    document.getElementById('highscore').innerText = hs || 0;
 }
 
 // ══════════════════════════════════════════════════════
@@ -608,6 +957,7 @@ function doLevelClear() {
         updateUI();
         setPendingReward(lastGrade);
     }
+    saveHighScore(score);
 
     draw();
 
@@ -684,6 +1034,7 @@ function doLevelClear() {
 // ══════════════════════════════════════════════════════
 function doGameOver() {
     if (extraLives > 0) { doRespawn(); return; }
+    saveHighScore(score);
     gState = 'gameOver';
     clearTimeout(loopTimer);
     draw();
@@ -727,6 +1078,7 @@ function doRespawn() {
 // WIN
 // ══════════════════════════════════════════════════════
 function drawWin() {
+    saveHighScore(score);
     gState = 'win';
     clearTimeout(loopTimer);
     ctx.fillStyle = '#071c07';
@@ -748,23 +1100,68 @@ function drawWin() {
 // IDLE / WELCOME
 // ══════════════════════════════════════════════════════
 function drawIdle() {
+    // Background
     ctx.fillStyle = '#8bac0f';
     ctx.fillRect(0, 0, 300, 300);
-    ctx.fillStyle = '#0f380f';
+
+    // Dot grid
+    ctx.fillStyle = '#7a9c0a';
+    for (let x = 0; x < COLS; x++)
+        for (let y = 0; y < ROWS; y++)
+            ctx.fillRect(x*CELL+6, y*CELL+6, 2, 2);
+
+    // Title box
+    ctx.fillStyle = 'rgba(10,40,10,0.85)';
+    ctx.fillRect(20, 18, 260, 52);
+    ctx.strokeStyle = '#9bbc0f';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(20, 18, 260, 52);
+
+    ctx.fillStyle = '#ffff44';
     ctx.textAlign = 'center';
-    ctx.font = 'bold 20px "Courier New"';
-    ctx.fillText('SNAKE EVO', 150, 78);
-    ctx.font = '11px "Courier New"';
-    ctx.fillText('wrap walls \u2022 obstacles from lv2', 150, 112);
-    ctx.fillText('eat 16 prey to clear each level', 150, 128);
-    ctx.font = '10px "Courier New"';
-    ctx.fillStyle = '#306230';
-    ctx.fillText('S=\u2665life  A=ghost  B=pass walls', 150, 162);
-    ctx.fillText('C=score\u00d7  D=spd hold  E=+coins', 150, 176);
-    ctx.fillText('F = GAME OVER (spend \u2665 to survive)', 150, 190);
+    ctx.font = 'bold 26px "Courier New"';
+    ctx.fillText('SNAKE  EVO', 150, 52);
+
+    // Info rows
+    let rows = [
+        { icon:'D', text:'D-PAD steers the snake', col:'#ffff44' },
+        { icon:'F', text:'Eat 16 prey to clear each level', col:'#88ff88' },
+        { icon:'X', text:'Hit wall or self = GAME OVER', col:'#cc3322' },
+        { icon:'S\u2013F', text:'Grades give rewards each level', col:'#44aaff' },
+    ];
+    let startY = 92;
+    rows.forEach((r, i) => {
+        let y = startY + i * 40;
+        // icon badge
+        ctx.fillStyle = 'rgba(10,40,10,0.75)';
+        ctx.fillRect(22, y - 14, 30, 22);
+        ctx.strokeStyle = r.col;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(22, y - 14, 30, 22);
+        ctx.fillStyle = r.col;
+        ctx.font = 'bold 12px "Courier New"';
+        ctx.textAlign = 'center';
+        ctx.fillText(r.icon, 37, y + 1);
+        // text
+        ctx.fillStyle = '#c8e070';
+        ctx.font = 'bold 11px "Courier New"';
+        ctx.textAlign = 'left';
+        ctx.fillText(r.text, 60, y + 2);
+    });
+
+    // Press START
+    ctx.textAlign = 'center';
     ctx.fillStyle = '#0f380f';
-    ctx.font = '11px "Courier New"';
-    ctx.fillText('press START to play', 150, 238);
+    ctx.font = 'bold 13px "Courier New"';
+    ctx.fillText('press  START  to  play', 150, 265);
+
+    // Player name greeting
+    let name = getPlayerName();
+    if (name) {
+        ctx.fillStyle = '#306230';
+        ctx.font = '10px "Courier New"';
+        ctx.fillText('Welcome back, ' + name + '!', 150, 282);
+    }
 }
 
 // ══════════════════════════════════════════════════════
@@ -867,8 +1264,17 @@ function resetGame() {
 // START BUTTON
 // ══════════════════════════════════════════════════════
 function startGame() {
+    if (gState==='tutorial' || gState==='register') return;
     if (gState==='idle' || gState==='gameOver' || gState==='win') {
-        resetGame(); beginLevel();
+        if (!getTutSeen()) {
+            localStorage.setItem('snakeevo_tutseen', '1');
+            showTutorial();
+        } else if (!getPlayerName()) {
+            showRegister();
+        } else {
+            startActualGame();
+        }
+        return;
     } else if (gState==='levelClear') {
         if (lastGrade==='F') {
             if (extraLives > 0) {
@@ -879,6 +1285,7 @@ function startGame() {
             } else {
                 // True elimination
                 let lv=level, sc=score, co=coins;
+                saveHighScore(sc);
                 resetGame();
                 gState = 'gameOver';
                 ctx.fillStyle = '#0a0404';
@@ -986,7 +1393,11 @@ document.addEventListener('keydown', e => {
     if (e.key==='ArrowDown' ||e.key==='s'){e.preventDefault();setDir('down');}
     if (e.key==='ArrowLeft' ||e.key==='a'){e.preventDefault();setDir('left');}
     if (e.key==='ArrowRight'||e.key==='d'){e.preventDefault();setDir('right');}
-    if (e.key==='Enter'||e.key===' ')    {e.preventDefault();startGame();}
+    if (e.key==='Enter'||e.key===' ') {
+        if (gState==='register') { submitRegistration(); return; }
+        if (gState==='tutorial') { nextTutPage(); return; }
+        e.preventDefault(); startGame();
+    }
 });
 
 // ══════════════════════════════════════════════════════
@@ -999,6 +1410,7 @@ extraLives=0; ghostActive=false; obstPassActive=false;
 mult=1.0; speedHold=false; obstacles=[]; pendingReward=null;
 currentLevelSpeed=calcSpeed(1); lastGrade=null;
 updateUI();
+updateStatsBar();
 drawIdle();
 </script>
 
