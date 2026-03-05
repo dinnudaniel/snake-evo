@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Snake Evo</title>
-
 <style>
 body{
     margin:0;
@@ -54,8 +53,9 @@ canvas{
 .info{
     display:flex;
     justify-content:space-between;
-    font-size:12px;
+    font-size:11px;
     margin-top:5px;
+    padding:0 2px;
 }
 
 /* ── MENU OVERLAY ── */
@@ -260,21 +260,22 @@ canvas{
         <canvas id="game" width="300" height="300"></canvas>
 
         <div class="info">
-            <span>LV <span id="level">1</span></span>
-            <span>SCORE <span id="score">0</span></span>
+            <span>LV<span id="level">1</span></span>
+            <span>PREY <span id="prey">0</span>/16</span>
+            <span>&#162;<span id="coins">0</span></span>
         </div>
 
-        <!-- MENU OVERLAY (sits over the screen) -->
+        <!-- MENU OVERLAY -->
         <div id="menuOverlay">
 
             <!-- MAIN MENU -->
             <div id="mainMenu">
                 <div class="menuTitle">MENU</div>
-                <button class="menuBtn" onclick="menuPlay()">▶ PLAY</button>
-                <button class="menuBtn" onclick="menuPause()">⏸ PAUSE</button>
-                <button class="menuBtn" onclick="menuRestart()">↺ RESTART</button>
-                <button class="menuBtn" onclick="openDpadPanel()">⊞ CUSTOMIZE D-PAD</button>
-                <button class="menuBtn" onclick="closeMenu()">✕ CLOSE</button>
+                <button class="menuBtn" onclick="menuPlay()">&#9654; PLAY</button>
+                <button class="menuBtn" onclick="menuPause()">&#9646;&#9646; PAUSE</button>
+                <button class="menuBtn" onclick="menuRestart()">&#8635; RESTART</button>
+                <button class="menuBtn" onclick="openDpadPanel()">&#8862; CUSTOMIZE D-PAD</button>
+                <button class="menuBtn" onclick="closeMenu()">&#10005; CLOSE</button>
             </div>
 
             <!-- D-PAD CUSTOMIZE PANEL -->
@@ -295,7 +296,7 @@ canvas{
                     <span id="posLabel" style="font-size:10px;color:#9bbc0f">CENTER</span>
                 </div>
 
-                <button class="backBtn" onclick="closeDpadPanel()">◄ BACK</button>
+                <button class="backBtn" onclick="closeDpadPanel()">&#9668; BACK</button>
             </div>
 
         </div>
@@ -315,15 +316,15 @@ canvas{
         <div id="dpadWrap">
             <div class="dpad" id="dpad">
                 <div></div>
-                <button class="dpadBtn" onclick="setDir('up')">▲</button>
+                <button class="dpadBtn" onclick="setDir('up')">&#9650;</button>
                 <div></div>
 
-                <button class="dpadBtn" onclick="setDir('left')">◄</button>
-                <button class="dpadBtn boost" id="boostBtn" onclick="boost()">●</button>
-                <button class="dpadBtn" onclick="setDir('right')">►</button>
+                <button class="dpadBtn" onclick="setDir('left')">&#9668;</button>
+                <button class="dpadBtn boost" id="boostBtn" onclick="boost()">&#9679;</button>
+                <button class="dpadBtn" onclick="setDir('right')">&#9658;</button>
 
                 <div></div>
-                <button class="dpadBtn" onclick="setDir('down')">▼</button>
+                <button class="dpadBtn" onclick="setDir('down')">&#9660;</button>
                 <div></div>
             </div>
         </div>
@@ -333,202 +334,609 @@ canvas{
 </div>
 
 <script>
-let canvas=document.getElementById("game");
-let ctx=canvas.getContext("2d");
+// ═══════════════════════════════════════════════════════
+// SNAKE EVO — Full Engine
+// ═══════════════════════════════════════════════════════
 
-let grid=15;
-let snake=[{x:10,y:10}];
-let food={x:5,y:5};
-let dx=0, dy=0;
-let score=0, level=1;
-let speed=300;
-let running=false;
-let timer=null;
+const canvas = document.getElementById('game');
+const ctx    = canvas.getContext('2d');
 
-/* ── DRAW ── */
-function draw(){
-    ctx.fillStyle="#8bac0f";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+const COLS = 20, ROWS = 20, CELL = 15;
+const PREY_PER_LEVEL = 16;   // prey needed to clear each level
+const PREY_PTS   = 5;        // points per prey
+const PREY_COINS = 5;        // cents per prey
+const LEVEL_BONUS = 5;       // bonus pts awarded at level clear (80 prey pts + 5 bonus = 85 total for level 1)
 
-    ctx.fillStyle="#0f380f";
-    snake.forEach(s=>{
-        ctx.fillRect(s.x*grid,s.y*grid,grid-2,grid-2);
-    });
+// Grade thresholds in seconds (how fast you cleared the level)
+const GRADES = [
+    { grade:'S', max:40  },
+    { grade:'A', max:60  },
+    { grade:'B', max:80  },
+    { grade:'C', max:100 },
+    { grade:'D', max:130 },
+    { grade:'E', max:160 },
+    { grade:'F', max:Infinity }
+];
 
-    ctx.fillStyle="#306230";
-    ctx.fillRect(food.x*grid,food.y*grid,grid-2,grid-2);
+const GRADE_COLORS = {
+    S:'#ffff44', A:'#88ff88', B:'#44aaff',
+    C:'#ffaa44', D:'#ff8844', E:'#cc7755', F:'#aa5533'
+};
+
+// ── State ──────────────────────────────────────────────
+// idle | playing | paused | levelClear | gameOver | win
+let gState = 'idle';
+let snake, food, dx, dy;
+let score, level, coins, preyEaten;
+let levelStartTime, loopTimer = null, speed;
+
+// ── Active Rewards ──────────────────────────────────────
+let ghostActive = false, ghostEnd = 0;   // S: pass through own body
+let mult = 1.0, multEnd = 0;             // B/C/D: score multiplier
+let wallMode = false;                    // A: obstacle walls appear level 2+
+let easyNext  = false;                   // F consolation: reduced speed next level
+let pendingReward = null;                // reward queued for next level start
+
+// ── Obstacles ──────────────────────────────────────────
+let obstacles = [];
+let wallGrowAt = 0;
+
+// ══════════════════════════════════════════════════════
+// SPEED — Level 1 = 280ms, Level 100 = 80ms (linear)
+// ══════════════════════════════════════════════════════
+function calcSpeed(lv) {
+    return Math.max(80, Math.round(280 - (lv - 1) * (200 / 99)));
 }
 
-/* ── UPDATE ── */
-function update(){
-    if(!running)return;
+// ══════════════════════════════════════════════════════
+// FOOD SPAWN
+// ══════════════════════════════════════════════════════
+function spawnFood() {
+    let p, t = 0;
+    do {
+        p = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
+        t++;
+    } while (t < 500 && (
+        snake.some(s => s.x === p.x && s.y === p.y) ||
+        obstacles.some(o => o.x === p.x && o.y === p.y)
+    ));
+    return p;
+}
 
-    let head={x:snake[0].x+dx, y:snake[0].y+dy};
+// ══════════════════════════════════════════════════════
+// OBSTACLE WALLS
+// Level 2+: 1 wall. +1 wall every 5 levels, max 4.
+// Walls grow every 15 seconds.
+// ══════════════════════════════════════════════════════
+function wallsForLevel() {
+    if (!wallMode || level < 2) return 0;
+    return Math.min(1 + Math.floor((level - 2) / 5), 4);
+}
 
-    if(head.x<0||head.y<0||head.x>=20||head.y>=20){
-        gameOver();
-        return;
+function spawnObstacles() {
+    obstacles = [];
+    let n = wallsForLevel();
+    for (let i = 0; i < n; i++) addOneObstacle();
+}
+
+function addOneObstacle() {
+    for (let t = 0; t < 200; t++) {
+        let ox = 2 + Math.floor(Math.random() * 15);
+        let oy = 2 + Math.floor(Math.random() * 15);
+        // Not near snake start position
+        if (snake.some(s => Math.abs(s.x - ox) < 5 && Math.abs(s.y - oy) < 5)) continue;
+        // Not overlapping existing obstacles
+        if (obstacles.some(o => Math.abs(o.x - ox) < 4 && Math.abs(o.y - oy) < 4)) continue;
+        // L-shape (3 cells) or 2×2 (4 cells)
+        let cells = Math.random() < 0.5
+            ? [{x:ox,y:oy},{x:ox+1,y:oy},{x:ox,y:oy+1}]
+            : [{x:ox,y:oy},{x:ox+1,y:oy},{x:ox,y:oy+1},{x:ox+1,y:oy+1}];
+        obstacles = obstacles.concat(cells);
+        break;
+    }
+}
+
+function growObstacle() {
+    if (obstacles.length === 0) return;
+    const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+    let cands = [];
+    obstacles.forEach(w => {
+        dirs.forEach(d => {
+            let nx = w.x + d.dx, ny = w.y + d.dy;
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS &&
+                !obstacles.some(o => o.x === nx && o.y === ny) &&
+                !snake.some(s => s.x === nx && s.y === ny) &&
+                !(food && food.x === nx && food.y === ny)) {
+                cands.push({x:nx, y:ny});
+            }
+        });
+    });
+    if (cands.length) obstacles.push(cands[Math.floor(Math.random() * cands.length)]);
+}
+
+// ══════════════════════════════════════════════════════
+// GRADE & REWARDS
+// ══════════════════════════════════════════════════════
+function getGrade(secs) {
+    return (GRADES.find(g => secs <= g.max) || {grade:'F'}).grade;
+}
+
+function rewardLabel(g) {
+    return ({
+        S: 'GHOST MODE',
+        A: 'WALL OBSTACLES',
+        B: '2x SCORE BOOST',
+        C: '1.5x SCORE BOOST',
+        D: '1.25x SCORE BOOST',
+        E: 'NONE',
+        F: 'EASY START'
+    })[g] || 'NONE';
+}
+
+function rewardDesc(g) {
+    return ({
+        S: 'Pass through your own body',
+        A: 'Pop-up walls appear in levels',
+        B: 'Score x2 next level',
+        C: 'Score x1.5 next level',
+        D: 'Score x1.25 next level',
+        E: 'Keep grinding!',
+        F: 'Easier speed next level'
+    })[g] || '';
+}
+
+function setPendingReward(g) {
+    // Reward duration grows with level (capped at +60s)
+    let bonus = Math.min(level * 3, 60);
+    pendingReward =
+        g === 'S' ? {type:'ghost',   dur: 30 + bonus} :
+        g === 'A' ? {type:'wallMode'} :
+        g === 'B' ? {type:'mult', val:2.0,  dur: 20 + bonus} :
+        g === 'C' ? {type:'mult', val:1.5,  dur: 15 + bonus} :
+        g === 'D' ? {type:'mult', val:1.25, dur: 10 + bonus} :
+        g === 'F' ? {type:'easy'} :
+        null;
+}
+
+function activatePending() {
+    if (!pendingReward) return;
+    const r = pendingReward; pendingReward = null;
+    if      (r.type === 'ghost')    { ghostActive = true; ghostEnd = Date.now() + r.dur * 1000; }
+    else if (r.type === 'wallMode') { wallMode = true; }
+    else if (r.type === 'mult')     { mult = r.val; multEnd = Date.now() + r.dur * 1000; }
+    else if (r.type === 'easy')     { easyNext = true; }
+}
+
+// ══════════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════════
+function updateUI() {
+    document.getElementById('level').innerText = level;
+    document.getElementById('prey').innerText  = preyEaten;
+    document.getElementById('coins').innerText = coins;
+}
+
+// ══════════════════════════════════════════════════════
+// DRAW
+// ══════════════════════════════════════════════════════
+function draw() {
+    // Background
+    ctx.fillStyle = '#8bac0f';
+    ctx.fillRect(0, 0, 300, 300);
+
+    // Subtle grid dots
+    ctx.fillStyle = '#7a9c0a';
+    for (let x = 0; x < COLS; x++)
+        for (let y = 0; y < ROWS; y++)
+            ctx.fillRect(x * CELL + 6, y * CELL + 6, 2, 2);
+
+    // Obstacle walls
+    obstacles.forEach(o => {
+        ctx.fillStyle = '#3d2a08';
+        ctx.fillRect(o.x * CELL, o.y * CELL, CELL - 1, CELL - 1);
+        ctx.fillStyle = '#5c4418';
+        ctx.fillRect(o.x * CELL + 2, o.y * CELL + 2, CELL - 5, CELL - 5);
+    });
+
+    // Food
+    ctx.fillStyle = '#306230';
+    ctx.fillRect(food.x * CELL + 1, food.y * CELL + 1, CELL - 3, CELL - 3);
+    ctx.fillStyle = '#5aaa5a';
+    ctx.fillRect(food.x * CELL + 2, food.y * CELL + 2, 3, 3);
+
+    // Snake (transparent when ghost active)
+    ctx.globalAlpha = ghostActive ? 0.38 : 1.0;
+    snake.forEach((s, i) => {
+        ctx.fillStyle = i === 0 ? '#1e6a1e' : '#0f380f';
+        ctx.fillRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 3, CELL - 3);
+        if (i === 0) {
+            // Eyes on head
+            ctx.fillStyle = ghostActive ? '#ccff44' : '#9bbc0f';
+            ctx.fillRect(s.x * CELL + 3, s.y * CELL + 3, 2, 2);
+            ctx.fillRect(s.x * CELL + 8, s.y * CELL + 3, 2, 2);
+        }
+    });
+    ctx.globalAlpha = 1.0;
+
+    // HUD: active reward indicators (top-left of canvas)
+    let hud = [];
+    if (ghostActive && Date.now() < ghostEnd)
+        hud.push({ text: 'GHOST ' + Math.ceil((ghostEnd - Date.now()) / 1000) + 's', col: '#ccff44' });
+    if (mult > 1.0 && Date.now() < multEnd)
+        hud.push({ text: mult + 'x ' + Math.ceil((multEnd - Date.now()) / 1000) + 's', col: '#ffcc44' });
+    if (wallMode && level >= 2)
+        hud.push({ text: 'WALLS', col: '#ff8844' });
+
+    if (hud.length) {
+        let bw = 90, bh = hud.length * 14 + 6;
+        ctx.fillStyle = 'rgba(10,40,10,0.78)';
+        ctx.fillRect(1, 1, bw, bh);
+        ctx.font = '10px "Courier New"';
+        ctx.textAlign = 'left';
+        hud.forEach((h, i) => {
+            ctx.fillStyle = h.col;
+            ctx.fillText(h.text, 4, 13 + i * 14);
+        });
+        ctx.textAlign = 'center';
+    }
+}
+
+// ══════════════════════════════════════════════════════
+// LEVEL CLEAR SCREEN
+// ══════════════════════════════════════════════════════
+function doLevelClear() {
+    gState = 'levelClear';
+    clearTimeout(loopTimer);
+
+    // Level bonus points
+    score  += LEVEL_BONUS;
+    coins  += LEVEL_BONUS;
+    updateUI();
+
+    let elapsed = (Date.now() - levelStartTime) / 1000;
+    let grade   = getGrade(elapsed);
+    setPendingReward(grade);
+
+    draw(); // show game state underneath overlay
+
+    ctx.fillStyle = 'rgba(15,56,15,0.90)';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.textAlign = 'center';
+
+    // Header
+    ctx.fillStyle = '#9bbc0f';
+    ctx.font = 'bold 15px "Courier New"';
+    ctx.fillText('LEVEL ' + level + ' CLEAR!', 150, 40);
+
+    // Big grade letter
+    ctx.fillStyle = GRADE_COLORS[grade] || '#9bbc0f';
+    ctx.font = 'bold 62px "Courier New"';
+    ctx.fillText(grade, 150, 118);
+
+    // Stats
+    ctx.fillStyle = '#9bbc0f';
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('TIME: ' + elapsed.toFixed(1) + 's', 150, 148);
+    ctx.fillText('SCORE: ' + score + '  \u00A2' + coins, 150, 164);
+
+    // Reward
+    ctx.font = 'bold 12px "Courier New"';
+    ctx.fillStyle = GRADE_COLORS[grade] || '#9bbc0f';
+    ctx.fillText('REWARD \u203A ' + rewardLabel(grade), 150, 190);
+    ctx.font = '10px "Courier New"';
+    ctx.fillStyle = '#7a9c4a';
+    ctx.fillText(rewardDesc(grade), 150, 206);
+
+    // Continue prompt
+    ctx.fillStyle = '#9bbc0f';
+    ctx.font = '10px "Courier New"';
+    ctx.fillText(
+        level < 100 ? 'START \u203A level ' + (level + 1) : 'START \u203A FINAL CLEAR!',
+        150, 250
+    );
+}
+
+// ══════════════════════════════════════════════════════
+// GAME OVER SCREEN
+// ══════════════════════════════════════════════════════
+function doGameOver() {
+    gState = 'gameOver';
+    clearTimeout(loopTimer);
+
+    draw();
+    ctx.fillStyle = 'rgba(15,56,15,0.82)';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.fillStyle = '#9bbc0f';
+    ctx.textAlign = 'center';
+
+    ctx.font = 'bold 22px "Courier New"';
+    ctx.fillText('GAME OVER', 150, 108);
+
+    ctx.font = '13px "Courier New"';
+    ctx.fillText('LV ' + level + '  SCORE ' + score, 150, 142);
+    ctx.fillText('\u00A2' + coins + ' COINS EARNED', 150, 162);
+
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('press START to retry', 150, 210);
+}
+
+// ══════════════════════════════════════════════════════
+// WIN SCREEN (level 100 cleared)
+// ══════════════════════════════════════════════════════
+function drawWin() {
+    gState = 'win';
+    clearTimeout(loopTimer);
+
+    ctx.fillStyle = '#071c07';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.textAlign = 'center';
+
+    ctx.fillStyle = '#ffff44';
+    ctx.font = 'bold 22px "Courier New"';
+    ctx.fillText('YOU WIN!', 150, 92);
+
+    ctx.font = '12px "Courier New"';
+    ctx.fillStyle = '#9bbc0f';
+    ctx.fillText('100 LEVELS COMPLETE', 150, 122);
+    ctx.fillText('FINAL SCORE: ' + score, 150, 146);
+    ctx.fillText('\u00A2' + coins + ' COINS EARNED', 150, 166);
+
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('press START to play again', 150, 220);
+}
+
+// ══════════════════════════════════════════════════════
+// IDLE / WELCOME SCREEN
+// ══════════════════════════════════════════════════════
+function drawIdle() {
+    ctx.fillStyle = '#8bac0f';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.fillStyle = '#0f380f';
+    ctx.textAlign = 'center';
+
+    ctx.font = 'bold 20px "Courier New"';
+    ctx.fillText('SNAKE EVO', 150, 88);
+
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('press START to play', 150, 128);
+    ctx.fillText('walls wrap \u2022 earn rewards', 150, 148);
+    ctx.fillText('reach level 100!', 150, 168);
+
+    ctx.font = '10px "Courier New"';
+    ctx.fillStyle = '#306230';
+    ctx.fillText('S=ghost  A=walls  B-D=score\u00D7', 150, 200);
+    ctx.fillText('grade how fast you clear each level', 150, 216);
+}
+
+// ══════════════════════════════════════════════════════
+// GAME UPDATE
+// ══════════════════════════════════════════════════════
+function update() {
+    if (gState !== 'playing') return;
+
+    // No direction pressed yet — just redraw
+    if (dx === 0 && dy === 0) { draw(); return; }
+
+    // Expire rewards
+    if (ghostActive && Date.now() > ghostEnd) ghostActive = false;
+    if (mult > 1    && Date.now() > multEnd)  mult = 1.0;
+
+    // Grow obstacle wall periodically
+    if (wallMode && obstacles.length > 0 && Date.now() >= wallGrowAt) {
+        growObstacle();
+        wallGrowAt = Date.now() + 15000;
+    }
+
+    // New head — WRAP through walls (all levels, all boundaries)
+    let head = {
+        x: (snake[0].x + dx + COLS) % COLS,
+        y: (snake[0].y + dy + ROWS) % ROWS
+    };
+
+    // Self collision — death UNLESS ghost mode is active
+    // Check all segments except the tail (which moves away this tick)
+    if (!ghostActive) {
+        let body = snake.slice(0, snake.length - 1);
+        if (body.some(s => s.x === head.x && s.y === head.y)) {
+            doGameOver(); return;
+        }
+    }
+
+    // Obstacle wall collision — always lethal
+    if (obstacles.some(o => o.x === head.x && o.y === head.y)) {
+        doGameOver(); return;
     }
 
     snake.unshift(head);
 
-    if(head.x===food.x && head.y===food.y){
-        score+=10;
-        if(score%50===0){
-            level++;
-            speed=Math.max(80,speed-20);
-        }
-        food={
-            x:Math.floor(Math.random()*20),
-            y:Math.floor(Math.random()*20)
-        };
-        document.getElementById("score").innerText=score;
-        document.getElementById("level").innerText=level;
-    }else{
+    if (head.x === food.x && head.y === food.y) {
+        let pts = Math.round(PREY_PTS * mult);
+        let cts = Math.round(PREY_COINS * mult);
+        score  += pts;
+        coins  += cts;
+        preyEaten++;
+        food = spawnFood();
+        updateUI();
+
+        if (preyEaten >= PREY_PER_LEVEL) { doLevelClear(); return; }
+    } else {
         snake.pop();
     }
 
     draw();
 }
 
-/* ── LOOP ── */
-function loop(){
+// ══════════════════════════════════════════════════════
+// GAME LOOP
+// ══════════════════════════════════════════════════════
+function loop() {
     update();
-    timer=setTimeout(loop,speed);
+    if (gState === 'playing') loopTimer = setTimeout(loop, speed);
 }
 
-/* ── START ── */
-function startGame(){
-    if(!running){
-        running=true;
-        loop();
+// ══════════════════════════════════════════════════════
+// BEGIN LEVEL (called after reset or level advance)
+// ══════════════════════════════════════════════════════
+function beginLevel() {
+    snake = [{x: 10, y: 10}];
+    dx = 0; dy = 0;
+    preyEaten = 0;
+    obstacles = [];
+
+    activatePending();
+
+    speed = calcSpeed(level);
+    if (easyNext) { speed = Math.min(speed + 60, 280); easyNext = false; }
+
+    if (wallMode && level >= 2) {
+        spawnObstacles();
+        wallGrowAt = Date.now() + 15000;
     }
-}
 
-/* ── PAUSE ── */
-function pauseGame(){
-    running=false;
-    clearTimeout(timer);
-}
-
-/* ── RESUME ── */
-function resumeGame(){
-    if(!running){
-        running=true;
-        loop();
-    }
-}
-
-/* ── RESTART ── */
-function restartGame(){
-    clearTimeout(timer);
-    snake=[{x:10,y:10}];
-    food={x:5,y:5};
-    dx=0; dy=0;
-    score=0; level=1; speed=300;
-    document.getElementById("score").innerText=0;
-    document.getElementById("level").innerText=1;
-    running=true;
+    food = spawnFood();
+    levelStartTime = Date.now();
+    gState = 'playing';
+    updateUI();
     loop();
 }
 
-/* ── GAME OVER ── */
-function gameOver(){
-    running=false;
-    clearTimeout(timer);
-    ctx.fillStyle="rgba(15,56,15,0.75)";
-    ctx.fillRect(0,0,300,300);
-    ctx.fillStyle="#9bbc0f";
-    ctx.font="bold 20px 'Courier New'";
-    ctx.textAlign="center";
-    ctx.fillText("GAME OVER",150,130);
-    ctx.font="14px 'Courier New'";
-    ctx.fillText("SCORE: "+score,150,158);
-    ctx.fillText("LEVEL: "+level,150,178);
-    ctx.font="11px 'Courier New'";
-    ctx.fillText("press START",150,210);
+// ══════════════════════════════════════════════════════
+// RESET (full game reset)
+// ══════════════════════════════════════════════════════
+function resetGame() {
+    clearTimeout(loopTimer);
+    score = 0; level = 1; coins = 0; preyEaten = 0;
+    ghostActive = false; mult = 1.0;
+    wallMode = false; easyNext = false;
+    pendingReward = null; obstacles = [];
+    updateUI();
 }
 
-/* ── CONTROLS ── */
-function setDir(dir){
-    if(dir==="up"   && dy===0){dx=0;dy=-1;}
-    if(dir==="down" && dy===0){dx=0;dy=1;}
-    if(dir==="left" && dx===0){dx=-1;dy=0;}
-    if(dir==="right"&& dx===0){dx=1;dy=0;}
+// ══════════════════════════════════════════════════════
+// START BUTTON LOGIC
+// ══════════════════════════════════════════════════════
+function startGame() {
+    if (gState === 'idle' || gState === 'gameOver' || gState === 'win') {
+        resetGame();
+        beginLevel();
+    } else if (gState === 'levelClear') {
+        if (level >= 100) { drawWin(); return; }
+        level++;
+        beginLevel();
+    }
+    // playing/paused: do nothing (use menu)
 }
 
-function boost(){
-    let prev=speed;
-    speed=50;
-    setTimeout(()=>{ speed=prev; },1000);
+// ══════════════════════════════════════════════════════
+// DIRECTION INPUT
+// ══════════════════════════════════════════════════════
+function setDir(dir) {
+    if (dir === 'up'    && dy === 0) { dx = 0;  dy = -1; }
+    if (dir === 'down'  && dy === 0) { dx = 0;  dy = 1;  }
+    if (dir === 'left'  && dx === 0) { dx = -1; dy = 0;  }
+    if (dir === 'right' && dx === 0) { dx = 1;  dy = 0;  }
 }
 
-/* ── MENU ── */
-function openMenu(){
-    pauseGame();
-    document.getElementById("menuOverlay").classList.add("open");
-    document.getElementById("mainMenu").style.display="";
-    document.getElementById("dpadPanel").classList.remove("open");
+// ══════════════════════════════════════════════════════
+// BOOST
+// ══════════════════════════════════════════════════════
+function boost() {
+    if (gState !== 'playing') return;
+    let prev = speed;
+    speed = 50;
+    setTimeout(() => { speed = prev; }, 1000);
 }
 
-function closeMenu(){
-    document.getElementById("menuOverlay").classList.remove("open");
+// ══════════════════════════════════════════════════════
+// MENU
+// ══════════════════════════════════════════════════════
+function openMenu() {
+    if (gState === 'levelClear') return;
+    if (gState === 'playing') { gState = 'paused'; clearTimeout(loopTimer); }
+    document.getElementById('menuOverlay').classList.add('open');
+    document.getElementById('mainMenu').style.display = '';
+    document.getElementById('dpadPanel').classList.remove('open');
 }
 
-function menuPlay(){
+function closeMenu() {
+    document.getElementById('menuOverlay').classList.remove('open');
+}
+
+function menuPlay() {
     closeMenu();
-    resumeGame();
+    if (gState === 'idle' || gState === 'gameOver' || gState === 'win') {
+        resetGame(); beginLevel();
+    } else if (gState === 'paused') {
+        gState = 'playing'; loop();
+    }
 }
 
-function menuPause(){
-    pauseGame();
+function menuPause() {
+    if (gState === 'playing') { gState = 'paused'; clearTimeout(loopTimer); }
     closeMenu();
 }
 
-function menuRestart(){
+function menuRestart() {
     closeMenu();
-    restartGame();
+    resetGame();
+    beginLevel();
 }
 
-/* ── D-PAD PANEL ── */
-function openDpadPanel(){
-    document.getElementById("mainMenu").style.display="none";
-    document.getElementById("dpadPanel").classList.add("open");
+// ══════════════════════════════════════════════════════
+// D-PAD PANEL
+// ══════════════════════════════════════════════════════
+function openDpadPanel() {
+    document.getElementById('mainMenu').style.display = 'none';
+    document.getElementById('dpadPanel').classList.add('open');
 }
 
-function closeDpadPanel(){
-    document.getElementById("mainMenu").style.display="";
-    document.getElementById("dpadPanel").classList.remove("open");
+function closeDpadPanel() {
+    document.getElementById('mainMenu').style.display = '';
+    document.getElementById('dpadPanel').classList.remove('open');
 }
 
-let dpadSizes={S:40, M:60, L:80};
-let currentSize="M";
+const dpadSizes = { S:40, M:60, L:80 };
 
-function setDpadSize(s){
-    currentSize=s;
-    let px=dpadSizes[s];
-    let dpad=document.getElementById("dpad");
-    dpad.style.gridTemplateColumns=px+"px "+px+"px "+px+"px";
-    dpad.style.gridTemplateRows=px+"px "+px+"px "+px+"px";
-    document.querySelectorAll(".dpadBtn").forEach(b=>{
-        b.style.fontSize=(px*0.35)+"px";
-    });
-    ["S","M","L"].forEach(k=>{
-        document.getElementById("size"+k).classList.toggle("active",k===s);
-    });
+function setDpadSize(s) {
+    let px = dpadSizes[s];
+    let dpad = document.getElementById('dpad');
+    dpad.style.gridTemplateColumns = px+'px '+px+'px '+px+'px';
+    dpad.style.gridTemplateRows    = px+'px '+px+'px '+px+'px';
+    document.querySelectorAll('.dpadBtn').forEach(b => { b.style.fontSize = (px * 0.35) + 'px'; });
+    ['S','M','L'].forEach(k => document.getElementById('size'+k).classList.toggle('active', k === s));
 }
 
-function setDpadPos(val){
-    document.getElementById("dpadWrap").style.marginLeft=val+"px";
-    let lbl=document.getElementById("posLabel");
-    if(val==0)     lbl.innerText="CENTER";
-    else if(val<0) lbl.innerText="LEFT "+Math.abs(val)+"px";
-    else           lbl.innerText="RIGHT "+val+"px";
+function setDpadPos(val) {
+    document.getElementById('dpadWrap').style.marginLeft = val + 'px';
+    let lbl = document.getElementById('posLabel');
+    lbl.innerText = val == 0 ? 'CENTER' : val < 0 ? 'LEFT '+Math.abs(val)+'px' : 'RIGHT '+val+'px';
 }
 
-/* init dpad size to medium */
-setDpadSize("M");
-draw();
+// ══════════════════════════════════════════════════════
+// KEYBOARD
+// ══════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowUp'    || e.key === 'w') { e.preventDefault(); setDir('up');    }
+    if (e.key === 'ArrowDown'  || e.key === 's') { e.preventDefault(); setDir('down');  }
+    if (e.key === 'ArrowLeft'  || e.key === 'a') { e.preventDefault(); setDir('left');  }
+    if (e.key === 'ArrowRight' || e.key === 'd') { e.preventDefault(); setDir('right'); }
+    if (e.key === 'Enter' || e.key === ' ')      { e.preventDefault(); startGame();     }
+});
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+setDpadSize('M');
+// Bootstrap safe defaults so spawnFood/draw can run
+snake = [{x:10, y:10}];
+food  = {x:5, y:5};
+dx = 0; dy = 0;
+score = 0; level = 1; coins = 0; preyEaten = 0;
+ghostActive = false; mult = 1.0;
+wallMode = false; easyNext = false;
+obstacles = []; pendingReward = null;
+updateUI();
+drawIdle();
 </script>
 
 </body>
