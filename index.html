@@ -55,7 +55,7 @@ canvas{
     justify-content:space-between;
     font-size:11px;
     font-weight:bold;
-    margin-top:5px;
+    margin-bottom:5px;
     padding:0 2px;
 }
 
@@ -228,33 +228,24 @@ canvas{
     text-decoration:underline;
 }
 
-/* ── STATS BAR ── */
-.statsBar{
-    width:360px;
-    margin:10px auto 0;
+/* ── MINI STATS (inside device) ── */
+.miniStats{
     display:flex;
     justify-content:space-around;
-    text-align:center;
     font-family:"Courier New",monospace;
-}
-.statCol{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:2px;
-}
-.statVal{
-    font-size:18px;
+    font-size:10px;
     font-weight:bold;
     color:#9bbc0f;
+    background:#1a1a1a;
+    border-radius:6px;
+    padding:4px 6px;
+    margin:6px 0 4px;
 }
-.statLabel{
-    font-size:8px;
+.miniStats .miniLabel{
     color:#5a6a7a;
+    font-size:8px;
     text-transform:uppercase;
-    letter-spacing:1px;
-    line-height:1.2;
-    max-width:110px;
+    letter-spacing:0.5px;
 }
 
 /* ── LIVE LEADERBOARD ── */
@@ -515,13 +506,14 @@ canvas{
 
         <div class="title">SNAKE EVO</div>
 
-        <canvas id="game" width="300" height="300"></canvas>
-
         <div class="info">
             <span>HIGH SCORE <span id="highscore">0</span></span>
-            <span>PREY <span id="prey">0</span>/16</span>
             <span>COIN <span id="coins">0</span></span>
         </div>
+
+        <span id="prey" style="display:none">0</span>
+
+        <canvas id="game" width="300" height="300"></canvas>
 
         <!-- TUTORIAL OVERLAY -->
         <div id="tutorialOverlay">
@@ -622,6 +614,13 @@ canvas{
             <button class="sysBtn menuTrigger" onclick="openMenu()">MENU</button>
         </div>
 
+        <!-- COMPACT STATS -->
+        <div class="miniStats">
+            <span><span class="miniLabel">REG</span> <span id="statReg">0</span></span>
+            <span><span class="live-dot"></span> <span class="miniLabel">ACTIVE</span> <span id="statActive">0</span></span>
+            <span><span class="miniLabel">BEST</span> <span id="statBest">—</span></span>
+        </div>
+
         <!-- D-PAD with BOOST in center -->
         <div id="dpadWrap">
             <div class="dpad" id="dpad">
@@ -643,21 +642,6 @@ canvas{
 
 </div>
 
-<!-- STATS BAR BELOW DEVICE -->
-<div class="statsBar">
-    <div class="statCol">
-        <span class="statLabel">REGISTERED</span>
-        <span class="statVal" id="statReg">0</span>
-    </div>
-    <div class="statCol">
-        <span class="statLabel"><span class="live-dot"></span> ACTIVE</span>
-        <span class="statVal" id="statActive">0</span>
-    </div>
-    <div class="statCol">
-        <span class="statLabel">BEST SCORE</span>
-        <span class="statVal" id="statBest">—</span>
-    </div>
-</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -953,8 +937,7 @@ function activatePending() {
 function updateUI() {
     document.getElementById('prey').innerText      = preyEaten;
     document.getElementById('coins').innerText     = coins;
-    let hs = Math.max(getHighScore(), score);
-    document.getElementById('highscore').innerText = hs || 0;
+    document.getElementById('highscore').innerText = score || 0;
 }
 
 // ══════════════════════════════════════════════════════
