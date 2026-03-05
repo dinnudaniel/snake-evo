@@ -716,7 +716,7 @@ const SPECIES_TIERS = [
 function getSpeciesData(lv) {
     if (!lv || lv < 2) return { name:null, head:'#1e6a1e', body:'#0f380f', eye:'#9bbc0f' };
     let idx = Math.min(Math.floor((lv - 2) / 2), SPECIES.length - 1);
-    let tier = Math.min(Math.floor(idx / 2), 9);
+    let tier = Math.min(idx, 9);
     let [head, body, eye] = SPECIES_TIERS[tier];
     return { name: SPECIES[idx], head, body, eye };
 }
