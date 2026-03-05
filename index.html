@@ -722,6 +722,63 @@ function getSpeciesData(lv) {
 }
 
 // ══════════════════════════════════════════════════════
+// PREY SYSTEM — type, colors, size, name per level
+// ══════════════════════════════════════════════════════
+
+// Prey type based on level / snake species
+function getPreyType(lv) {
+    if (lv <= 1) return 'egg';
+    const name = (getSpeciesData(lv).name || '');
+    if (name === 'EGG-EATING SNAKE') return 'egg';
+    if (name === 'RING-NECKED SNAKE' || name === 'SMOOTH GREEN SNAKE') return 'bug';
+    if (name === 'GARTER SNAKE' || name === 'HOG-NOSED SNAKE' || name === 'FLYING SNAKE') return 'frog';
+    if (name === 'CORN SNAKE' || name === 'BULL SNAKE' || name === 'RAT SNAKE') return 'mouse';
+    if (name === 'COACHWHIP' || name === 'VINE SNAKE' || name === 'CAT-EYED SNAKE' || name === 'MANGROVE SNAKE') return 'lizard';
+    // From Milk Snake (crimson, ~L12) onwards — live snake prey
+    if (lv >= 12) return 'snake';
+    return 'mouse';
+}
+
+// Prey snake species label displayed on screen
+function getPreySnakeName(lv) {
+    if (lv >= 62) return 'GIANT PYTHON';
+    if (lv >= 42) return 'ANACONDA';
+    if (lv >= 32) return 'BLACK MAMBA';
+    if (lv >= 22) return 'KING COBRA';
+    return 'KING COBRA';  // From crimson L12 — prey looks like a King Cobra
+}
+
+// Prey snake body length (number of segments)
+function getPreySnakeSize(lv) {
+    if (lv >= 42) return 4;
+    if (lv >= 22) return 3;
+    return 2;
+}
+
+// Prey colors — always contrast with the player's current tier colors
+// Player tier 0=neon-green, 1=yellow, 2=orange, 3=red-orange, 4=red,
+//             5=crimson, 6=purple, 7=violet, 8=blue, 9=black
+const PREY_TIER_COLORS = [
+    { head:'#cc8833', body:'#885522', eye:'#ffeeaa' }, // vs T0 neon-green  → warm tan
+    { head:'#2266cc', body:'#113388', eye:'#88aaff' }, // vs T1 yellow      → blue
+    { head:'#008877', body:'#005544', eye:'#44ffee' }, // vs T2 orange      → teal
+    { head:'#44aadd', body:'#226688', eye:'#aaeeff' }, // vs T3 red-orange  → sky blue
+    { head:'#aaaaaa', body:'#777777', eye:'#eeeeee' }, // vs T4 red         → silver
+    { head:'#ddaa00', body:'#886600', eye:'#ffee55' }, // vs T5 crimson     → golden
+    { head:'#44cc22', body:'#226600', eye:'#aaff88' }, // vs T6 purple      → lime
+    { head:'#ff8800', body:'#994400', eye:'#ffcc66' }, // vs T7 violet      → orange
+    { head:'#eecc00', body:'#887700', eye:'#ffee44' }, // vs T8 blue        → yellow
+    { head:'#ddddbb', body:'#999977', eye:'#ffff88' }, // vs T9 black       → ivory
+];
+
+function getPreyColors(lv) {
+    if (!lv || lv < 2) return PREY_TIER_COLORS[0];
+    let idx = Math.min(Math.floor((lv - 2) / 2), SPECIES.length - 1);
+    let tier = Math.min(idx, 9);
+    return PREY_TIER_COLORS[tier];
+}
+
+// ══════════════════════════════════════════════════════
 // STORAGE (localStorage)
 // ══════════════════════════════════════════════════════
 function getRegistered()  { return JSON.parse(localStorage.getItem('snakeevo_reg') || '[]'); }
@@ -824,6 +881,11 @@ function startActualGame() {
 let gState = 'idle';
 let snake, food, dx, dy;
 let score, level, coins, preyEaten;
+// Live prey snake (for snake-eating levels)
+let preySnake = null;        // [{x,y},...] segments, head first; null = static prey
+let preyDx = 1, preyDy = 0; // prey direction
+let preyMoveTick = 0;        // ticks since last prey move
+const PREY_MOVE_EVERY = 5;   // prey moves every N game ticks (sluggish)
 let levelStartTime, loopTimer = null, speed;
 let currentLevelSpeed = 280; // actual speed used this level (for D grade)
 let lastGrade = null;
@@ -861,6 +923,9 @@ function obstaclesForLevel() {
 // FOOD SPAWN
 // ══════════════════════════════════════════════════════
 function spawnFood() {
+    preySnake = null;
+    preyMoveTick = 0;
+
     let p, t = 0;
     do {
         p = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
@@ -869,7 +934,59 @@ function spawnFood() {
         snake.some(s => s.x === p.x && s.y === p.y) ||
         obstacles.some(o => o.x === p.x && o.y === p.y)
     ));
+
+    if (getPreyType(level) === 'snake') {
+        // Spawn a live sluggish prey snake
+        const allDirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+        const d = allDirs[Math.floor(Math.random() * 4)];
+        preyDx = d.dx; preyDy = d.dy;
+        const size = getPreySnakeSize(level);
+        preySnake = [];
+        for (let i = 0; i < size; i++) {
+            preySnake.push({
+                x: (p.x - d.dx * i + COLS) % COLS,
+                y: (p.y - d.dy * i + ROWS) % ROWS
+            });
+        }
+    }
+
     return p;
+}
+
+// Move prey snake one step (sluggish, obstacle-aware, occasionally turns)
+function movePrey() {
+    if (!preySnake || preySnake.length === 0) return;
+
+    // 20% chance to spontaneously turn left or right (makes it feel alive)
+    if (Math.random() < 0.2) {
+        const turns = [{dx:-preyDy,dy:preyDx},{dx:preyDy,dy:-preyDx}];
+        const turn = turns[Math.floor(Math.random() * 2)];
+        const tx = (preySnake[0].x + turn.dx + COLS) % COLS;
+        const ty = (preySnake[0].y + turn.dy + ROWS) % ROWS;
+        if (!obstacles.some(o => o.x===tx && o.y===ty)) {
+            preyDx = turn.dx; preyDy = turn.dy;
+        }
+    }
+
+    // Try: forward, left turn, right turn, reverse
+    const candidates = [
+        {dx:preyDx,  dy:preyDy},
+        {dx:-preyDy, dy:preyDx},
+        {dx:preyDy,  dy:-preyDx},
+        {dx:-preyDx, dy:-preyDy}
+    ];
+
+    for (const d of candidates) {
+        const nx = (preySnake[0].x + d.dx + COLS) % COLS;
+        const ny = (preySnake[0].y + d.dy + ROWS) % ROWS;
+        if (obstacles.some(o => o.x===nx && o.y===ny)) continue;
+        if (preySnake.slice(0, -1).some(ps => ps.x===nx && ps.y===ny)) continue;
+        preyDx = d.dx; preyDy = d.dy;
+        preySnake.unshift({x:nx, y:ny});
+        preySnake.pop();
+        food = preySnake[0]; // keep food synced to prey head
+        break;
+    }
 }
 
 // ══════════════════════════════════════════════════════
@@ -988,6 +1105,171 @@ function updateUI() {
 }
 
 // ══════════════════════════════════════════════════════
+// PREY RENDERING
+// ══════════════════════════════════════════════════════
+function drawPrey() {
+    const type = getPreyType(level);
+    const fx = food.x * CELL, fy = food.y * CELL;
+    const cx = fx + CELL / 2,  cy = fy + CELL / 2;
+
+    if (type === 'snake' && preySnake && preySnake.length > 0) {
+        // ── Live prey snake ────────────────────────────
+        const pc = getPreyColors(level);
+        const H  = CELL / 2;
+        const bw = CELL - 6; // slightly slimmer than player
+
+        // 1. Dark outline
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = bw + 2;
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.beginPath();
+        preySnake.forEach((s, i) => {
+            const w = i > 0 && (Math.abs(s.x-preySnake[i-1].x)>1 || Math.abs(s.y-preySnake[i-1].y)>1);
+            w || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+        });
+        ctx.stroke();
+
+        // 2. Body fill
+        ctx.strokeStyle = pc.body;
+        ctx.lineWidth = bw;
+        ctx.beginPath();
+        preySnake.forEach((s, i) => {
+            const w = i > 0 && (Math.abs(s.x-preySnake[i-1].x)>1 || Math.abs(s.y-preySnake[i-1].y)>1);
+            w || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+        });
+        ctx.stroke();
+
+        // 3. Head box
+        const h = preySnake[0];
+        ctx.fillStyle = pc.head;
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(h.x*CELL+2, h.y*CELL+2, CELL-4, CELL-4, 2);
+        ctx.fill(); ctx.stroke();
+
+        // 4. Eyes (direction-aware)
+        let pe1x, pe1y, pe2x, pe2y;
+        if (preyDx === 1)       { pe1x=h.x*CELL+11; pe1y=h.y*CELL+4;  pe2x=h.x*CELL+11; pe2y=h.y*CELL+10; }
+        else if (preyDx === -1) { pe1x=h.x*CELL+4;  pe1y=h.y*CELL+4;  pe2x=h.x*CELL+4;  pe2y=h.y*CELL+10; }
+        else if (preyDy === 1)  { pe1x=h.x*CELL+4;  pe1y=h.y*CELL+11; pe2x=h.x*CELL+10; pe2y=h.y*CELL+11; }
+        else                    { pe1x=h.x*CELL+4;  pe1y=h.y*CELL+4;  pe2x=h.x*CELL+10; pe2y=h.y*CELL+4;  }
+        ctx.fillStyle = pc.eye;
+        ctx.beginPath(); ctx.arc(pe1x, pe1y, 1.8, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pe2x, pe2y, 1.8, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(pe1x, pe1y, 0.9, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pe2x, pe2y, 0.9, 0, Math.PI*2); ctx.fill();
+
+        // 5. Flicking tongue
+        if (Date.now() % 700 < 350) {
+            ctx.strokeStyle = '#cc1111'; ctx.lineWidth = 0.8; ctx.lineCap = 'round';
+            const tx = h.x*CELL+H, ty = h.y*CELL+H;
+            let bx2, by2, f1x, f1y, f2x, f2y;
+            if      (preyDx === 1)  { bx2=tx+8; by2=ty;   f1x=bx2+3; f1y=by2-2;  f2x=bx2+3; f2y=by2+2;  }
+            else if (preyDx === -1) { bx2=tx-8; by2=ty;   f1x=bx2-3; f1y=by2-2;  f2x=bx2-3; f2y=by2+2;  }
+            else if (preyDy === 1)  { bx2=tx;   by2=ty+8; f1x=bx2-2; f1y=by2+3;  f2x=bx2+2; f2y=by2+3;  }
+            else                    { bx2=tx;   by2=ty-8; f1x=bx2-2; f1y=by2-3;  f2x=bx2+2; f2y=by2-3;  }
+            ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(bx2,by2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(bx2,by2); ctx.lineTo(f1x,f1y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(bx2,by2); ctx.lineTo(f2x,f2y); ctx.stroke();
+        }
+
+        // Prey name label (bottom-left, contrasting eye color)
+        const pName = getPreySnakeName(level);
+        ctx.font = '7px "Courier New"';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillText(pName, 2, 298);
+        ctx.fillStyle = pc.eye;
+        ctx.fillText(pName, 1, 297);
+        ctx.textAlign = 'center';
+
+    } else {
+        // ── Static thematic prey ───────────────────────
+        switch (type) {
+            case 'egg': {
+                // Oval egg — cream / ivory
+                ctx.save();
+                ctx.translate(cx, cy); ctx.scale(0.85, 1.25);
+                ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, Math.PI*2);
+                ctx.fillStyle = '#ffe8c8'; ctx.fill();
+                ctx.strokeStyle = '#ccaa77'; ctx.lineWidth = 1; ctx.stroke();
+                ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                ctx.beginPath(); ctx.arc(-1.5, -1.5, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.restore();
+                break;
+            }
+            case 'bug': {
+                // Small insect — dark brown body, red eyes
+                ctx.fillStyle = '#554422';
+                ctx.beginPath(); ctx.ellipse(cx, cy, 3, 4.5, 0, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#332211'; ctx.lineWidth = 0.8;
+                for (let l = -1; l <= 1; l++) {
+                    ctx.beginPath(); ctx.moveTo(cx-3, cy+l*1.8); ctx.lineTo(cx-5.5, cy+l*1.8-0.8); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(cx+3, cy+l*1.8); ctx.lineTo(cx+5.5, cy+l*1.8-0.8); ctx.stroke();
+                }
+                ctx.fillStyle = '#ff4400';
+                ctx.beginPath(); ctx.arc(cx-1.2, cy-3.5, 1, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx+1.2, cy-3.5, 1, 0, Math.PI*2); ctx.fill();
+                break;
+            }
+            case 'frog': {
+                // Green frog blob with yellow eyes
+                ctx.fillStyle = '#226622';
+                ctx.beginPath(); ctx.ellipse(cx, cy+1, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#44aa44';
+                ctx.beginPath(); ctx.ellipse(cx, cy, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#ffcc00';
+                ctx.beginPath(); ctx.arc(cx-2.5, cy-2, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx+2.5, cy-2, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#111';
+                ctx.beginPath(); ctx.arc(cx-2.5, cy-2, 0.7, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx+2.5, cy-2, 0.7, 0, Math.PI*2); ctx.fill();
+                break;
+            }
+            case 'mouse': {
+                // Gray mouse — oval body with pink ears and red eye
+                ctx.fillStyle = '#888888';
+                ctx.beginPath(); ctx.ellipse(cx, cy+1, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#aaaaaa';
+                ctx.beginPath(); ctx.ellipse(cx, cy, 4.5, 3.5, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#888888';
+                ctx.beginPath(); ctx.arc(cx-3, cy-3.5, 2, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx+3, cy-3.5, 2, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#cc8888';
+                ctx.beginPath(); ctx.arc(cx-3, cy-3.5, 1, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx+3, cy-3.5, 1, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#ff2222';
+                ctx.beginPath(); ctx.arc(cx+2, cy-1, 1, 0, Math.PI*2); ctx.fill();
+                break;
+            }
+            case 'lizard': {
+                // Elongated green lizard
+                ctx.fillStyle = '#1a5c1a';
+                ctx.beginPath(); ctx.ellipse(cx, cy, 6, 2.5, -0.2, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#33aa33';
+                ctx.beginPath(); ctx.ellipse(cx-1, cy-0.5, 5, 2, -0.2, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#228822';
+                ctx.beginPath(); ctx.ellipse(cx+4.5, cy-1, 2.2, 1.8, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#ffcc00';
+                ctx.beginPath(); ctx.arc(cx+5.5, cy-1.5, 1, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#111';
+                ctx.beginPath(); ctx.arc(cx+5.5, cy-1.5, 0.5, 0, Math.PI*2); ctx.fill();
+                break;
+            }
+            default: {
+                // Fallback — original food dot
+                ctx.fillStyle = '#306230';
+                ctx.fillRect(food.x*CELL+1, food.y*CELL+1, CELL-3, CELL-3);
+                ctx.fillStyle = '#5aaa5a';
+                ctx.fillRect(food.x*CELL+2, food.y*CELL+2, 3, 3);
+            }
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════
 // DRAW
 // ══════════════════════════════════════════════════════
 function draw() {
@@ -1008,11 +1290,8 @@ function draw() {
         ctx.fillRect(o.x*CELL+2, o.y*CELL+2, CELL-5, CELL-5);
     });
 
-    // Food
-    ctx.fillStyle = '#306230';
-    ctx.fillRect(food.x*CELL+1, food.y*CELL+1, CELL-3, CELL-3);
-    ctx.fillStyle = '#5aaa5a';
-    ctx.fillRect(food.x*CELL+2, food.y*CELL+2, 3, 3);
+    // Prey — type-aware rendering
+    drawPrey();
 
     // Snake — real graphical rendering
     const sp = getSpeciesData(level);
@@ -1383,7 +1662,21 @@ function update() {
 
     snake.unshift(head);
 
-    if (head.x === food.x && head.y === food.y) {
+    // Move prey snake sluggishly (every PREY_MOVE_EVERY ticks)
+    if (preySnake) {
+        preyMoveTick++;
+        if (preyMoveTick >= PREY_MOVE_EVERY) {
+            preyMoveTick = 0;
+            movePrey();
+        }
+    }
+
+    // Check if player ate prey (any segment of live snake, or static food)
+    const ateFood = preySnake
+        ? preySnake.some(ps => ps.x === head.x && ps.y === head.y)
+        : (head.x === food.x && head.y === food.y);
+
+    if (ateFood) {
         let pts = PREY_PTS;
         let cts = Math.round(PREY_COINS * mult);
         score += pts; coins += cts; preyEaten++;
@@ -1411,6 +1704,7 @@ function loop() {
 function beginLevel() {
     snake = [{x:10, y:10}]; dx = 0; dy = 0;
     preyEaten = 0; obstacles = [];
+    preySnake = null; preyMoveTick = 0;
 
     activatePending();
 
@@ -1441,6 +1735,7 @@ function resetGame() {
     mult = 1.0; speedHold = false;
     currentLevelSpeed = calcSpeed(1);
     pendingReward = null; obstacles = []; lastGrade = null;
+    preySnake = null; preyMoveTick = 0;
     updateUI();
 }
 
@@ -1566,6 +1861,7 @@ score=0; level=1; coins=0; preyEaten=0;
 extraLives=0; ghostActive=false; obstPassActive=false;
 mult=1.0; speedHold=false; obstacles=[]; pendingReward=null;
 currentLevelSpeed=calcSpeed(1); lastGrade=null;
+preySnake=null; preyMoveTick=0;
 updateUI();
 updateStatsBar();
 drawIdle();
