@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Snake Evo</title>
-
 <style>
 body{
     margin:0;
@@ -54,8 +53,9 @@ canvas{
 .info{
     display:flex;
     justify-content:space-between;
-    font-size:12px;
+    font-size:11px;
     margin-top:5px;
+    padding:0 2px;
 }
 
 /* ── MENU OVERLAY ── */
@@ -260,21 +260,22 @@ canvas{
         <canvas id="game" width="300" height="300"></canvas>
 
         <div class="info">
-            <span>LV <span id="level">1</span></span>
-            <span>SCORE <span id="score">0</span></span>
+            <span>LV<span id="level">1</span></span>
+            <span>PREY <span id="prey">0</span>/16</span>
+            <span>&#162;<span id="coins">0</span></span>
         </div>
 
-        <!-- MENU OVERLAY (sits over the screen) -->
+        <!-- MENU OVERLAY -->
         <div id="menuOverlay">
 
             <!-- MAIN MENU -->
             <div id="mainMenu">
                 <div class="menuTitle">MENU</div>
-                <button class="menuBtn" onclick="menuPlay()">▶ PLAY</button>
-                <button class="menuBtn" onclick="menuPause()">⏸ PAUSE</button>
-                <button class="menuBtn" onclick="menuRestart()">↺ RESTART</button>
-                <button class="menuBtn" onclick="openDpadPanel()">⊞ CUSTOMIZE D-PAD</button>
-                <button class="menuBtn" onclick="closeMenu()">✕ CLOSE</button>
+                <button class="menuBtn" onclick="menuPlay()">&#9654; PLAY</button>
+                <button class="menuBtn" onclick="menuPause()">&#9646;&#9646; PAUSE</button>
+                <button class="menuBtn" onclick="menuRestart()">&#8635; RESTART</button>
+                <button class="menuBtn" onclick="openDpadPanel()">&#8862; CUSTOMIZE D-PAD</button>
+                <button class="menuBtn" onclick="closeMenu()">&#10005; CLOSE</button>
             </div>
 
             <!-- D-PAD CUSTOMIZE PANEL -->
@@ -295,7 +296,7 @@ canvas{
                     <span id="posLabel" style="font-size:10px;color:#9bbc0f">CENTER</span>
                 </div>
 
-                <button class="backBtn" onclick="closeDpadPanel()">◄ BACK</button>
+                <button class="backBtn" onclick="closeDpadPanel()">&#9668; BACK</button>
             </div>
 
         </div>
@@ -315,15 +316,15 @@ canvas{
         <div id="dpadWrap">
             <div class="dpad" id="dpad">
                 <div></div>
-                <button class="dpadBtn" onclick="setDir('up')">▲</button>
+                <button class="dpadBtn" onclick="setDir('up')">&#9650;</button>
                 <div></div>
 
-                <button class="dpadBtn" onclick="setDir('left')">◄</button>
-                <button class="dpadBtn boost" id="boostBtn" onclick="boost()">●</button>
-                <button class="dpadBtn" onclick="setDir('right')">►</button>
+                <button class="dpadBtn" onclick="setDir('left')">&#9668;</button>
+                <button class="dpadBtn boost" id="boostBtn" onclick="boost()">&#9679;</button>
+                <button class="dpadBtn" onclick="setDir('right')">&#9658;</button>
 
                 <div></div>
-                <button class="dpadBtn" onclick="setDir('down')">▼</button>
+                <button class="dpadBtn" onclick="setDir('down')">&#9660;</button>
                 <div></div>
             </div>
         </div>
@@ -333,202 +334,672 @@ canvas{
 </div>
 
 <script>
-let canvas=document.getElementById("game");
-let ctx=canvas.getContext("2d");
+// ═══════════════════════════════════════════════════════
+// SNAKE EVO — Full Engine v3
+// ═══════════════════════════════════════════════════════
 
-let grid=15;
-let snake=[{x:10,y:10}];
-let food={x:5,y:5};
-let dx=0, dy=0;
-let score=0, level=1;
-let speed=300;
-let running=false;
-let timer=null;
+const canvas = document.getElementById('game');
+const ctx    = canvas.getContext('2d');
 
-/* ── DRAW ── */
-function draw(){
-    ctx.fillStyle="#8bac0f";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+const COLS = 20, ROWS = 20, CELL = 15;
+const PREY_PER_LEVEL = 16;
+const PREY_PTS   = 5;
+const PREY_COINS = 5;
+const LEVEL_BONUS = 5; // +5 pts/coins on clear → 16×5+5 = 85 total for level 1
 
-    ctx.fillStyle="#0f380f";
-    snake.forEach(s=>{
-        ctx.fillRect(s.x*grid,s.y*grid,grid-2,grid-2);
-    });
+// Grade thresholds (seconds to clear 16 prey)
+const GRADES = [
+    { grade:'S', max:40  },
+    { grade:'A', max:60  },
+    { grade:'B', max:80  },
+    { grade:'C', max:100 },
+    { grade:'D', max:130 },
+    { grade:'E', max:160 },
+    { grade:'F', max:Infinity }
+];
 
-    ctx.fillStyle="#306230";
-    ctx.fillRect(food.x*grid,food.y*grid,grid-2,grid-2);
+const GRADE_COLORS = {
+    S:'#ffff44', A:'#88ff88', B:'#44aaff',
+    C:'#ffaa44', D:'#ff8844', E:'#aabbaa', F:'#cc3322'
+};
+
+// ── State ──────────────────────────────────────────────
+// idle | playing | paused | respawning | levelClear | gameOver | win
+let gState = 'idle';
+let snake, food, dx, dy;
+let score, level, coins, preyEaten;
+let levelStartTime, loopTimer = null, speed;
+let currentLevelSpeed = 280; // actual speed used this level (for D grade)
+let lastGrade = null;
+
+// ── Active Rewards ──────────────────────────────────────
+let extraLives = 0;                                  // S: survive a death or F once (max 3)
+let ghostActive = false, ghostEnd = 0;               // A: pass through own body
+let obstPassActive = false, obstPassEnd = 0;         // B: pass through obstacle walls
+let mult = 1.0, multEnd = 0;                         // C: score × 1.5
+let speedHold = false;                               // D: next level keeps this speed
+let pendingReward = null;
+
+// ── Obstacles (always active level 2+, no grade needed) ──
+let obstacles = [];
+let wallEvolveAt = 0; // 0 = disabled (before level 10)
+
+// ══════════════════════════════════════════════════════
+// SPEED — L1=280ms, L100=80ms linear
+// ══════════════════════════════════════════════════════
+function calcSpeed(lv) {
+    return Math.max(80, Math.round(280 - (lv - 1) * (200 / 99)));
 }
 
-/* ── UPDATE ── */
-function update(){
-    if(!running)return;
+// ══════════════════════════════════════════════════════
+// OBSTACLE COUNT PER LEVEL
+// L2=1, L3=2, L4=3, then +1 every 6 levels, max 8
+// ══════════════════════════════════════════════════════
+function obstaclesForLevel() {
+    if (level < 2) return 0;
+    if (level <= 4) return level - 1;
+    return Math.min(3 + Math.floor((level - 4) / 6), 8);
+}
 
-    let head={x:snake[0].x+dx, y:snake[0].y+dy};
+// ══════════════════════════════════════════════════════
+// FOOD SPAWN
+// ══════════════════════════════════════════════════════
+function spawnFood() {
+    let p, t = 0;
+    do {
+        p = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
+        t++;
+    } while (t < 500 && (
+        snake.some(s => s.x === p.x && s.y === p.y) ||
+        obstacles.some(o => o.x === p.x && o.y === p.y)
+    ));
+    return p;
+}
 
-    if(head.x<0||head.y<0||head.x>=20||head.y>=20){
-        gameOver();
-        return;
+// ══════════════════════════════════════════════════════
+// OBSTACLE WALLS
+// ══════════════════════════════════════════════════════
+function spawnObstacles() {
+    obstacles = [];
+    let n = obstaclesForLevel();
+    for (let i = 0; i < n; i++) addOneObstacle();
+}
+
+function addOneObstacle() {
+    for (let t = 0; t < 200; t++) {
+        let ox = 2 + Math.floor(Math.random() * 15);
+        let oy = 2 + Math.floor(Math.random() * 15);
+        if (snake.some(s => Math.abs(s.x - ox) < 5 && Math.abs(s.y - oy) < 5)) continue;
+        if (obstacles.some(o => Math.abs(o.x - ox) < 4 && Math.abs(o.y - oy) < 4)) continue;
+        let cells = Math.random() < 0.5
+            ? [{x:ox,y:oy},{x:ox+1,y:oy},{x:ox,y:oy+1}]           // L-shape
+            : [{x:ox,y:oy},{x:ox+1,y:oy},{x:ox,y:oy+1},{x:ox+1,y:oy+1}]; // 2×2
+        obstacles = obstacles.concat(cells);
+        break;
+    }
+}
+
+// Grow 1 cell — only called from level 10+
+function growObstacle() {
+    const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+    let cands = [];
+    obstacles.forEach(w => {
+        dirs.forEach(d => {
+            let nx = w.x+d.dx, ny = w.y+d.dy;
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS &&
+                !obstacles.some(o => o.x===nx && o.y===ny) &&
+                !snake.some(s => s.x===nx && s.y===ny) &&
+                !(food && food.x===nx && food.y===ny)) {
+                cands.push({x:nx, y:ny});
+            }
+        });
+    });
+    if (cands.length) obstacles.push(cands[Math.floor(Math.random() * cands.length)]);
+}
+
+// Shrink 1 cell — only called from level 10+
+function shrinkObstacle() {
+    if (obstacles.length > 1) obstacles.splice(Math.floor(Math.random() * obstacles.length), 1);
+}
+
+// Randomly grow OR shrink — only active from level 10
+// Interval: 30s at L10, scaling down to 20s at L50+
+function evolveObstacles() {
+    if (obstacles.length === 0) return;
+    Math.random() < 0.65 ? growObstacle() : shrinkObstacle();
+    let interval = Math.max(20000, 30000 - (level - 10) * 250);
+    wallEvolveAt = Date.now() + interval;
+}
+
+// ══════════════════════════════════════════════════════
+// GRADE & REWARDS
+// S=extra life | A=ghost | B=obstacle pass | C=score×1.5
+// D=speed hold | E=+5¢ | F=GAME OVER (lose life to survive)
+// ══════════════════════════════════════════════════════
+function getGrade(secs) {
+    return (GRADES.find(g => secs <= g.max) || {grade:'F'}).grade;
+}
+
+function rewardLabel(g) {
+    return ({
+        S:'EXTRA LIFE', A:'GHOST MODE', B:'OBSTACLE PASS',
+        C:'1.5x SCORE', D:'SPEED HOLD', E:'KEEP IT UP!', F:'YOU LOSE'
+    })[g] || '';
+}
+
+function rewardDesc(g) {
+    return ({
+        S:'One free death stored (\u2665 max 3)',
+        A:'Pass through your own body',
+        B:'Pass through obstacle walls',
+        C:'Score \xd71.5 next level',
+        D:'Next level keeps this speed',
+        E:'+5 bonus coins for effort',
+        F:'Too slow \u2014 game resets (spend \u2665 to survive)'
+    })[g] || '';
+}
+
+function setPendingReward(g) {
+    let bonus = Math.min(level * 3, 60); // reward duration grows with level
+    pendingReward =
+        g==='S' ? {type:'extraLife'} :
+        g==='A' ? {type:'ghost',    dur: 30 + bonus} :
+        g==='B' ? {type:'obstPass', dur: 20 + bonus} :
+        g==='C' ? {type:'mult', val: 1.5, dur: 15 + bonus} :
+        g==='D' ? {type:'speedHold'} :
+        g==='E' ? {type:'encourage'} :
+        null; // F = game over, no reward
+}
+
+function activatePending() {
+    if (!pendingReward) return;
+    const r = pendingReward; pendingReward = null;
+    if      (r.type==='extraLife') { extraLives = Math.min(extraLives + 1, 3); }
+    else if (r.type==='ghost')     { ghostActive = true; ghostEnd = Date.now() + r.dur*1000; }
+    else if (r.type==='obstPass')  { obstPassActive = true; obstPassEnd = Date.now() + r.dur*1000; }
+    else if (r.type==='mult')      { mult = r.val; multEnd = Date.now() + r.dur*1000; }
+    else if (r.type==='speedHold') { speedHold = true; }
+    else if (r.type==='encourage') { coins += 5; updateUI(); }
+}
+
+// ══════════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════════
+function updateUI() {
+    document.getElementById('level').innerText = level;
+    document.getElementById('prey').innerText  = preyEaten;
+    document.getElementById('coins').innerText = coins;
+}
+
+// ══════════════════════════════════════════════════════
+// DRAW
+// ══════════════════════════════════════════════════════
+function draw() {
+    ctx.fillStyle = '#8bac0f';
+    ctx.fillRect(0, 0, 300, 300);
+
+    // Subtle grid dots
+    ctx.fillStyle = '#7a9c0a';
+    for (let x = 0; x < COLS; x++)
+        for (let y = 0; y < ROWS; y++)
+            ctx.fillRect(x*CELL+6, y*CELL+6, 2, 2);
+
+    // Obstacles — blue tint when obstacle pass active (visual cue)
+    obstacles.forEach(o => {
+        ctx.fillStyle = obstPassActive ? '#1a2a5a' : '#3d2a08';
+        ctx.fillRect(o.x*CELL, o.y*CELL, CELL-1, CELL-1);
+        ctx.fillStyle = obstPassActive ? '#3a5aaa' : '#5c4418';
+        ctx.fillRect(o.x*CELL+2, o.y*CELL+2, CELL-5, CELL-5);
+    });
+
+    // Food
+    ctx.fillStyle = '#306230';
+    ctx.fillRect(food.x*CELL+1, food.y*CELL+1, CELL-3, CELL-3);
+    ctx.fillStyle = '#5aaa5a';
+    ctx.fillRect(food.x*CELL+2, food.y*CELL+2, 3, 3);
+
+    // Snake — semi-transparent when ghost active
+    ctx.globalAlpha = ghostActive ? 0.38 : 1.0;
+    snake.forEach((s, i) => {
+        ctx.fillStyle = i === 0 ? '#1e6a1e' : '#0f380f';
+        ctx.fillRect(s.x*CELL+1, s.y*CELL+1, CELL-3, CELL-3);
+        if (i === 0) {
+            ctx.fillStyle = ghostActive ? '#ccff44' : '#9bbc0f';
+            ctx.fillRect(s.x*CELL+3, s.y*CELL+3, 2, 2);
+            ctx.fillRect(s.x*CELL+8, s.y*CELL+3, 2, 2);
+        }
+    });
+    ctx.globalAlpha = 1.0;
+
+    // HUD — active reward indicators
+    let hud = [];
+    if (extraLives > 0)
+        hud.push({ text: '\u2665'.repeat(extraLives), col: '#ff6666' });
+    if (ghostActive && Date.now() < ghostEnd)
+        hud.push({ text: 'GHOST '+Math.ceil((ghostEnd-Date.now())/1000)+'s', col: '#ccff44' });
+    if (obstPassActive && Date.now() < obstPassEnd)
+        hud.push({ text: 'PASS '+Math.ceil((obstPassEnd-Date.now())/1000)+'s', col: '#44aaff' });
+    if (mult > 1.0 && Date.now() < multEnd)
+        hud.push({ text: mult+'x '+Math.ceil((multEnd-Date.now())/1000)+'s', col: '#ffcc44' });
+
+    if (hud.length) {
+        let bw = 92, bh = hud.length*14+6;
+        ctx.fillStyle = 'rgba(10,40,10,0.80)';
+        ctx.fillRect(1, 1, bw, bh);
+        ctx.font = '10px "Courier New"';
+        ctx.textAlign = 'left';
+        hud.forEach((h, i) => { ctx.fillStyle = h.col; ctx.fillText(h.text, 4, 13+i*14); });
+        ctx.textAlign = 'center';
+    }
+}
+
+// ══════════════════════════════════════════════════════
+// LEVEL CLEAR
+// ══════════════════════════════════════════════════════
+function doLevelClear() {
+    gState = 'levelClear';
+    clearTimeout(loopTimer);
+    let elapsed = (Date.now() - levelStartTime) / 1000;
+    lastGrade = getGrade(elapsed);
+
+    if (lastGrade !== 'F') {
+        score += LEVEL_BONUS;
+        coins += LEVEL_BONUS;
+        updateUI();
+        setPendingReward(lastGrade);
+    }
+
+    draw();
+
+    if (lastGrade === 'F') {
+        // F = failure / too slow
+        ctx.fillStyle = 'rgba(20,4,4,0.93)';
+        ctx.fillRect(0, 0, 300, 300);
+        ctx.textAlign = 'center';
+
+        ctx.fillStyle = GRADE_COLORS['F'];
+        ctx.font = 'bold 64px "Courier New"';
+        ctx.fillText('F', 150, 112);
+
+        ctx.font = 'bold 14px "Courier New"';
+        ctx.fillText('TOO SLOW!', 150, 142);
+
+        ctx.font = '11px "Courier New"';
+        ctx.fillStyle = '#9bbc0f';
+        ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 166);
+        ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 182);
+
+        if (extraLives > 0) {
+            ctx.fillStyle = '#ff6666';
+            ctx.font = 'bold 11px "Courier New"';
+            ctx.fillText('\u2665 USE LIFE \u2192 continue to lv '+(level+1), 150, 212);
+            ctx.fillStyle = '#9bbc0f';
+            ctx.font = '10px "Courier New"';
+            ctx.fillText('('+extraLives+' '+(extraLives===1?'life':'lives')+' remaining)', 150, 226);
+        } else {
+            ctx.fillStyle = '#cc3322';
+            ctx.font = 'bold 12px "Courier New"';
+            ctx.fillText('ELIMINATED', 150, 212);
+            ctx.fillStyle = '#9bbc0f';
+            ctx.font = '10px "Courier New"';
+            ctx.fillText('no lives left \u2014 game resets', 150, 226);
+        }
+        ctx.fillStyle = '#9bbc0f';
+        ctx.fillText('press START', 150, 258);
+
+    } else {
+        // Normal grade screen
+        ctx.fillStyle = 'rgba(15,56,15,0.91)';
+        ctx.fillRect(0, 0, 300, 300);
+        ctx.textAlign = 'center';
+
+        ctx.fillStyle = '#9bbc0f';
+        ctx.font = 'bold 15px "Courier New"';
+        ctx.fillText('LEVEL '+level+' CLEAR!', 150, 40);
+
+        ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
+        ctx.font = 'bold 62px "Courier New"';
+        ctx.fillText(lastGrade, 150, 118);
+
+        ctx.fillStyle = '#9bbc0f';
+        ctx.font = '11px "Courier New"';
+        ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 148);
+        ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 164);
+
+        ctx.font = 'bold 12px "Courier New"';
+        ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
+        ctx.fillText('REWARD \u203A '+rewardLabel(lastGrade), 150, 190);
+
+        ctx.font = '10px "Courier New"';
+        ctx.fillStyle = '#7a9c4a';
+        ctx.fillText(rewardDesc(lastGrade), 150, 206);
+
+        ctx.fillStyle = '#9bbc0f';
+        ctx.fillText(level < 100 ? 'START \u203A level '+(level+1) : 'START \u203A FINAL!', 150, 250);
+    }
+}
+
+// ══════════════════════════════════════════════════════
+// MID-LEVEL DEATH (self or obstacle collision)
+// ══════════════════════════════════════════════════════
+function doGameOver() {
+    if (extraLives > 0) { doRespawn(); return; }
+    gState = 'gameOver';
+    clearTimeout(loopTimer);
+    draw();
+    ctx.fillStyle = 'rgba(15,56,15,0.82)';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.fillStyle = '#9bbc0f';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 22px "Courier New"';
+    ctx.fillText('GAME OVER', 150, 108);
+    ctx.font = '13px "Courier New"';
+    ctx.fillText('LV '+level+'  SCORE '+score, 150, 142);
+    ctx.fillText('\u00A2'+coins+' COINS', 150, 162);
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('press START to retry', 150, 210);
+}
+
+// ══════════════════════════════════════════════════════
+// RESPAWN (extra life consumed on mid-level death)
+// ══════════════════════════════════════════════════════
+function doRespawn() {
+    extraLives--;
+    gState = 'respawning';
+    clearTimeout(loopTimer);
+    snake = [{x:10, y:10}]; dx = 0; dy = 0;
+    draw();
+    ctx.fillStyle = 'rgba(15,56,15,0.80)';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff6666';
+    ctx.font = 'bold 20px "Courier New"';
+    ctx.fillText('EXTRA LIFE!', 150, 128);
+    ctx.font = '12px "Courier New"';
+    ctx.fillStyle = '#9bbc0f';
+    ctx.fillText('\u2665 '+extraLives+' remaining', 150, 156);
+    setTimeout(() => {
+        if (gState === 'respawning') { gState = 'playing'; loop(); }
+    }, 1500);
+}
+
+// ══════════════════════════════════════════════════════
+// WIN
+// ══════════════════════════════════════════════════════
+function drawWin() {
+    gState = 'win';
+    clearTimeout(loopTimer);
+    ctx.fillStyle = '#071c07';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffff44';
+    ctx.font = 'bold 22px "Courier New"';
+    ctx.fillText('YOU WIN!', 150, 92);
+    ctx.font = '12px "Courier New"';
+    ctx.fillStyle = '#9bbc0f';
+    ctx.fillText('100 LEVELS COMPLETE', 150, 122);
+    ctx.fillText('FINAL SCORE: '+score, 150, 146);
+    ctx.fillText('\u00A2'+coins+' COINS EARNED', 150, 166);
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('press START to play again', 150, 220);
+}
+
+// ══════════════════════════════════════════════════════
+// IDLE / WELCOME
+// ══════════════════════════════════════════════════════
+function drawIdle() {
+    ctx.fillStyle = '#8bac0f';
+    ctx.fillRect(0, 0, 300, 300);
+    ctx.fillStyle = '#0f380f';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 20px "Courier New"';
+    ctx.fillText('SNAKE EVO', 150, 78);
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('wrap walls \u2022 obstacles from lv2', 150, 112);
+    ctx.fillText('eat 16 prey to clear each level', 150, 128);
+    ctx.font = '10px "Courier New"';
+    ctx.fillStyle = '#306230';
+    ctx.fillText('S=\u2665life  A=ghost  B=pass walls', 150, 162);
+    ctx.fillText('C=score\u00d7  D=spd hold  E=+coins', 150, 176);
+    ctx.fillText('F = GAME OVER (spend \u2665 to survive)', 150, 190);
+    ctx.fillStyle = '#0f380f';
+    ctx.font = '11px "Courier New"';
+    ctx.fillText('press START to play', 150, 238);
+}
+
+// ══════════════════════════════════════════════════════
+// UPDATE
+// ══════════════════════════════════════════════════════
+function update() {
+    if (gState !== 'playing') return;
+    if (dx === 0 && dy === 0) { draw(); return; }
+
+    // Expire rewards
+    if (ghostActive    && Date.now() > ghostEnd)    ghostActive    = false;
+    if (obstPassActive && Date.now() > obstPassEnd) obstPassActive = false;
+    if (mult > 1       && Date.now() > multEnd)     mult           = 1.0;
+
+    // Evolve obstacles from level 10 only
+    if (level >= 10 && wallEvolveAt > 0 && Date.now() >= wallEvolveAt) {
+        evolveObstacles();
+    }
+
+    // New head — wrap through all 4 boundaries
+    let head = {
+        x: (snake[0].x + dx + COLS) % COLS,
+        y: (snake[0].y + dy + ROWS) % ROWS
+    };
+
+    // Self collision — only lethal without ghost
+    if (!ghostActive && snake.slice(0, -1).some(s => s.x===head.x && s.y===head.y)) {
+        doGameOver(); return;
+    }
+
+    // Obstacle collision — only lethal without obstacle pass
+    if (!obstPassActive && obstacles.some(o => o.x===head.x && o.y===head.y)) {
+        doGameOver(); return;
     }
 
     snake.unshift(head);
 
-    if(head.x===food.x && head.y===food.y){
-        score+=10;
-        if(score%50===0){
-            level++;
-            speed=Math.max(80,speed-20);
-        }
-        food={
-            x:Math.floor(Math.random()*20),
-            y:Math.floor(Math.random()*20)
-        };
-        document.getElementById("score").innerText=score;
-        document.getElementById("level").innerText=level;
-    }else{
+    if (head.x === food.x && head.y === food.y) {
+        let pts = Math.round(PREY_PTS * mult);
+        let cts = Math.round(PREY_COINS * mult);
+        score += pts; coins += cts; preyEaten++;
+        food = spawnFood();
+        updateUI();
+        if (preyEaten >= PREY_PER_LEVEL) { doLevelClear(); return; }
+    } else {
         snake.pop();
     }
 
     draw();
 }
 
-/* ── LOOP ── */
-function loop(){
+// ══════════════════════════════════════════════════════
+// LOOP
+// ══════════════════════════════════════════════════════
+function loop() {
     update();
-    timer=setTimeout(loop,speed);
+    if (gState === 'playing') loopTimer = setTimeout(loop, speed);
 }
 
-/* ── START ── */
-function startGame(){
-    if(!running){
-        running=true;
-        loop();
-    }
-}
+// ══════════════════════════════════════════════════════
+// BEGIN LEVEL
+// ══════════════════════════════════════════════════════
+function beginLevel() {
+    snake = [{x:10, y:10}]; dx = 0; dy = 0;
+    preyEaten = 0; obstacles = [];
 
-/* ── PAUSE ── */
-function pauseGame(){
-    running=false;
-    clearTimeout(timer);
-}
+    activatePending();
 
-/* ── RESUME ── */
-function resumeGame(){
-    if(!running){
-        running=true;
-        loop();
-    }
-}
+    let natural = calcSpeed(level);
+    if (speedHold) { speed = currentLevelSpeed; speedHold = false; }
+    else           { speed = natural; }
+    currentLevelSpeed = speed;
 
-/* ── RESTART ── */
-function restartGame(){
-    clearTimeout(timer);
-    snake=[{x:10,y:10}];
-    food={x:5,y:5};
-    dx=0; dy=0;
-    score=0; level=1; speed=300;
-    document.getElementById("score").innerText=0;
-    document.getElementById("level").innerText=1;
-    running=true;
+    spawnObstacles();
+
+    // Obstacle evolution only from level 10 (30s initial interval)
+    wallEvolveAt = (level >= 10 && obstacles.length > 0) ? Date.now() + 30000 : 0;
+
+    food = spawnFood();
+    levelStartTime = Date.now();
+    gState = 'playing';
+    updateUI();
     loop();
 }
 
-/* ── GAME OVER ── */
-function gameOver(){
-    running=false;
-    clearTimeout(timer);
-    ctx.fillStyle="rgba(15,56,15,0.75)";
-    ctx.fillRect(0,0,300,300);
-    ctx.fillStyle="#9bbc0f";
-    ctx.font="bold 20px 'Courier New'";
-    ctx.textAlign="center";
-    ctx.fillText("GAME OVER",150,130);
-    ctx.font="14px 'Courier New'";
-    ctx.fillText("SCORE: "+score,150,158);
-    ctx.fillText("LEVEL: "+level,150,178);
-    ctx.font="11px 'Courier New'";
-    ctx.fillText("press START",150,210);
+// ══════════════════════════════════════════════════════
+// RESET
+// ══════════════════════════════════════════════════════
+function resetGame() {
+    clearTimeout(loopTimer);
+    score = 0; level = 1; coins = 0; preyEaten = 0;
+    extraLives = 0; ghostActive = false; obstPassActive = false;
+    mult = 1.0; speedHold = false;
+    currentLevelSpeed = calcSpeed(1);
+    pendingReward = null; obstacles = []; lastGrade = null;
+    updateUI();
 }
 
-/* ── CONTROLS ── */
-function setDir(dir){
-    if(dir==="up"   && dy===0){dx=0;dy=-1;}
-    if(dir==="down" && dy===0){dx=0;dy=1;}
-    if(dir==="left" && dx===0){dx=-1;dy=0;}
-    if(dir==="right"&& dx===0){dx=1;dy=0;}
+// ══════════════════════════════════════════════════════
+// START BUTTON
+// ══════════════════════════════════════════════════════
+function startGame() {
+    if (gState==='idle' || gState==='gameOver' || gState==='win') {
+        resetGame(); beginLevel();
+    } else if (gState==='levelClear') {
+        if (lastGrade==='F') {
+            if (extraLives > 0) {
+                // Spend a life to survive F grade
+                extraLives--;
+                level++;
+                beginLevel();
+            } else {
+                // True elimination
+                let lv=level, sc=score, co=coins;
+                resetGame();
+                gState = 'gameOver';
+                ctx.fillStyle = '#0a0404';
+                ctx.fillRect(0, 0, 300, 300);
+                ctx.textAlign = 'center';
+                ctx.fillStyle = GRADE_COLORS['F'];
+                ctx.font = 'bold 42px "Courier New"';
+                ctx.fillText('F', 150, 88);
+                ctx.font = 'bold 16px "Courier New"';
+                ctx.fillStyle = '#cc3322';
+                ctx.fillText('ELIMINATED', 150, 120);
+                ctx.font = '11px "Courier New"';
+                ctx.fillStyle = '#9bbc0f';
+                ctx.fillText('LV '+lv+'  SCORE '+sc+'  \u00A2'+co, 150, 152);
+                ctx.fillText('press START to try again', 150, 210);
+            }
+        } else {
+            if (level >= 100) { drawWin(); return; }
+            level++;
+            beginLevel();
+        }
+    }
 }
 
-function boost(){
-    let prev=speed;
-    speed=50;
-    setTimeout(()=>{ speed=prev; },1000);
+// ══════════════════════════════════════════════════════
+// DIRECTION
+// ══════════════════════════════════════════════════════
+function setDir(dir) {
+    if (dir==='up'    && dy===0) {dx=0; dy=-1;}
+    if (dir==='down'  && dy===0) {dx=0; dy=1;}
+    if (dir==='left'  && dx===0) {dx=-1; dy=0;}
+    if (dir==='right' && dx===0) {dx=1; dy=0;}
 }
 
-/* ── MENU ── */
-function openMenu(){
-    pauseGame();
-    document.getElementById("menuOverlay").classList.add("open");
-    document.getElementById("mainMenu").style.display="";
-    document.getElementById("dpadPanel").classList.remove("open");
+// ══════════════════════════════════════════════════════
+// BOOST
+// ══════════════════════════════════════════════════════
+function boost() {
+    if (gState !== 'playing') return;
+    let prev = speed; speed = 50;
+    setTimeout(() => { speed = prev; }, 1000);
 }
 
-function closeMenu(){
-    document.getElementById("menuOverlay").classList.remove("open");
+// ══════════════════════════════════════════════════════
+// MENU
+// ══════════════════════════════════════════════════════
+function openMenu() {
+    if (gState==='levelClear' || gState==='respawning') return;
+    if (gState==='playing') { gState='paused'; clearTimeout(loopTimer); }
+    document.getElementById('menuOverlay').classList.add('open');
+    document.getElementById('mainMenu').style.display='';
+    document.getElementById('dpadPanel').classList.remove('open');
 }
 
-function menuPlay(){
+function closeMenu() { document.getElementById('menuOverlay').classList.remove('open'); }
+
+function menuPlay() {
     closeMenu();
-    resumeGame();
+    if (gState==='idle'||gState==='gameOver'||gState==='win') { resetGame(); beginLevel(); }
+    else if (gState==='paused') { gState='playing'; loop(); }
 }
 
-function menuPause(){
-    pauseGame();
+function menuPause() {
+    if (gState==='playing') { gState='paused'; clearTimeout(loopTimer); }
     closeMenu();
 }
 
-function menuRestart(){
-    closeMenu();
-    restartGame();
+function menuRestart() { closeMenu(); resetGame(); beginLevel(); }
+
+// ══════════════════════════════════════════════════════
+// D-PAD
+// ══════════════════════════════════════════════════════
+function openDpadPanel() {
+    document.getElementById('mainMenu').style.display='none';
+    document.getElementById('dpadPanel').classList.add('open');
 }
 
-/* ── D-PAD PANEL ── */
-function openDpadPanel(){
-    document.getElementById("mainMenu").style.display="none";
-    document.getElementById("dpadPanel").classList.add("open");
+function closeDpadPanel() {
+    document.getElementById('mainMenu').style.display='';
+    document.getElementById('dpadPanel').classList.remove('open');
 }
 
-function closeDpadPanel(){
-    document.getElementById("mainMenu").style.display="";
-    document.getElementById("dpadPanel").classList.remove("open");
+const dpadSizes = {S:40, M:60, L:80};
+
+function setDpadSize(s) {
+    let px = dpadSizes[s];
+    let dpad = document.getElementById('dpad');
+    dpad.style.gridTemplateColumns = px+'px '+px+'px '+px+'px';
+    dpad.style.gridTemplateRows    = px+'px '+px+'px '+px+'px';
+    document.querySelectorAll('.dpadBtn').forEach(b => { b.style.fontSize=(px*0.35)+'px'; });
+    ['S','M','L'].forEach(k => document.getElementById('size'+k).classList.toggle('active', k===s));
 }
 
-let dpadSizes={S:40, M:60, L:80};
-let currentSize="M";
-
-function setDpadSize(s){
-    currentSize=s;
-    let px=dpadSizes[s];
-    let dpad=document.getElementById("dpad");
-    dpad.style.gridTemplateColumns=px+"px "+px+"px "+px+"px";
-    dpad.style.gridTemplateRows=px+"px "+px+"px "+px+"px";
-    document.querySelectorAll(".dpadBtn").forEach(b=>{
-        b.style.fontSize=(px*0.35)+"px";
-    });
-    ["S","M","L"].forEach(k=>{
-        document.getElementById("size"+k).classList.toggle("active",k===s);
-    });
+function setDpadPos(val) {
+    document.getElementById('dpadWrap').style.marginLeft = val+'px';
+    let l = document.getElementById('posLabel');
+    l.innerText = val==0 ? 'CENTER' : val<0 ? 'LEFT '+Math.abs(val)+'px' : 'RIGHT '+val+'px';
 }
 
-function setDpadPos(val){
-    document.getElementById("dpadWrap").style.marginLeft=val+"px";
-    let lbl=document.getElementById("posLabel");
-    if(val==0)     lbl.innerText="CENTER";
-    else if(val<0) lbl.innerText="LEFT "+Math.abs(val)+"px";
-    else           lbl.innerText="RIGHT "+val+"px";
-}
+// ══════════════════════════════════════════════════════
+// KEYBOARD
+// ══════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+    if (e.key==='ArrowUp'   ||e.key==='w'){e.preventDefault();setDir('up');}
+    if (e.key==='ArrowDown' ||e.key==='s'){e.preventDefault();setDir('down');}
+    if (e.key==='ArrowLeft' ||e.key==='a'){e.preventDefault();setDir('left');}
+    if (e.key==='ArrowRight'||e.key==='d'){e.preventDefault();setDir('right');}
+    if (e.key==='Enter'||e.key===' ')    {e.preventDefault();startGame();}
+});
 
-/* init dpad size to medium */
-setDpadSize("M");
-draw();
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+setDpadSize('M');
+snake=[{x:10,y:10}]; food={x:5,y:5}; dx=0; dy=0;
+score=0; level=1; coins=0; preyEaten=0;
+extraLives=0; ghostActive=false; obstPassActive=false;
+mult=1.0; speedHold=false; obstacles=[]; pendingReward=null;
+currentLevelSpeed=calcSpeed(1); lastGrade=null;
+updateUI();
+drawIdle();
 </script>
 
 </body>
