@@ -119,6 +119,19 @@ canvas{
 .tutIcon.E{ color:#aabbaa; border-color:#aabbaa; }
 .tutIcon.F{ color:#cc3322; border-color:#cc3322; }
 
+.tutBadge{
+    display:inline-block;
+    background:#306230;
+    color:#9bbc0f;
+    font-size:9px;
+    font-weight:bold;
+    padding:1px 5px;
+    border-radius:3px;
+    border:1px solid #9bbc0f;
+    vertical-align:middle;
+    letter-spacing:1px;
+}
+
 .tutNav{
     display:flex;
     justify-content:space-between;
@@ -266,12 +279,16 @@ canvas{
     align-items:center;
     gap:6px;
 }
-.leaderboard h3 .live-dot{
-    width:7px;height:7px;
-    background:#ff4444;
+.live-dot{
+    width:6px;height:6px;
+    background:#44ff44;
     border-radius:50%;
     display:inline-block;
     animation:blink 1s infinite;
+}
+.leaderboard h3 .live-dot{
+    width:7px;height:7px;
+    background:#ff4444;
 }
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
 #lbList{
@@ -511,15 +528,15 @@ canvas{
                 </div>
                 <div class="tutRow">
                     <span class="tutIcon">F</span>
-                    <span>Each food = 1 pt &amp; 5 coins. Eat 16 prey to clear the level.</span>
+                    <span>Each food = 10 points. Eat more to grow and level up. <span class="tutBadge">+10pts</span></span>
                 </div>
                 <div class="tutRow">
                     <span class="tutIcon">X</span>
-                    <span>Hit a wall or yourself = GAME OVER. Walls wrap around all sides.</span>
+                    <span>Hit a wall or yourself and it is GAME OVER. Score resets to zero.</span>
                 </div>
                 <div class="tutRow">
-                    <span class="tutIcon">&#9679;</span>
-                    <span>Tap the center button for a 1-second BOOST of speed!</span>
+                    <span class="tutIcon">P</span>
+                    <span>Press PAUSE to resume, see leaderboard or change controls.</span>
                 </div>
                 <div class="tutNav">
                     <span onclick="skipTutorial()">SKIP</span>
@@ -623,16 +640,16 @@ canvas{
 <!-- STATS BAR BELOW DEVICE -->
 <div class="statsBar">
     <div class="statCol">
+        <span class="statLabel">REGISTERED</span>
         <span class="statVal" id="statReg">0</span>
-        <span class="statLabel">Registered Players</span>
     </div>
     <div class="statCol">
+        <span class="statLabel"><span class="live-dot"></span> ACTIVE</span>
         <span class="statVal" id="statActive">0</span>
-        <span class="statLabel">Active Now</span>
     </div>
     <div class="statCol">
+        <span class="statLabel">BEST SCORE</span>
         <span class="statVal" id="statBest">—</span>
-        <span class="statLabel">Highest Score<br>in the Game</span>
     </div>
 </div>
 
@@ -652,7 +669,7 @@ const ctx    = canvas.getContext('2d');
 
 const COLS = 20, ROWS = 20, CELL = 15;
 const PREY_PER_LEVEL = 16;
-const PREY_PTS        = 1;  // score: 1 point per prey
+const PREY_PTS        = 10; // score: 10 points per prey
 const PREY_COINS      = 5;  // coins: 5 per prey (unchanged)
 const LEVEL_BONUS_PTS  = 1;  // +1 score on level clear
 const LEVEL_BONUS_COINS= 5;  // +5 coins on level clear
@@ -1221,7 +1238,7 @@ function update() {
     snake.unshift(head);
 
     if (head.x === food.x && head.y === food.y) {
-        let pts = PREY_PTS;                       // always 1 per prey
+        let pts = PREY_PTS;
         let cts = Math.round(PREY_COINS * mult);
         score += pts; coins += cts; preyEaten++;
         food = spawnFood();
