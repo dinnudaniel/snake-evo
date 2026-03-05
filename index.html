@@ -6,11 +6,10 @@
 <title>Snake Evo</title>
 
 <style>
-/* BODY (device background, NOT green) */
 body{
     margin:0;
     background:#0b0f1a;
-    font-family: "Courier New", monospace;
+    font-family:"Courier New",monospace;
     color:#ccc;
     text-align:center;
 }
@@ -27,13 +26,15 @@ body{
         inset 4px 4px 10px rgba(255,255,255,0.8);
 }
 
-/* GREEN SCREEN ONLY */
+/* GREEN SCREEN */
 .screen{
     background:#9bbc0f;
     color:#0f380f;
     padding:10px;
     border-radius:10px;
     border:6px solid #222;
+    position:relative;
+    overflow:hidden;
 }
 
 /* CANVAS */
@@ -47,6 +48,7 @@ canvas{
 .title{
     font-weight:bold;
     margin-bottom:5px;
+    font-size:13px;
 }
 
 .info{
@@ -56,42 +58,200 @@ canvas{
     margin-top:5px;
 }
 
+/* ── MENU OVERLAY ── */
+#menuOverlay{
+    display:none;
+    position:absolute;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(15,56,15,0.93);
+    color:#9bbc0f;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    z-index:10;
+    border-radius:6px;
+}
+
+#menuOverlay.open{
+    display:flex;
+}
+
+.menuTitle{
+    font-size:16px;
+    font-weight:bold;
+    letter-spacing:4px;
+    margin-bottom:6px;
+    border-bottom:2px solid #9bbc0f;
+    padding-bottom:6px;
+    width:80%;
+    text-align:center;
+}
+
+.menuBtn{
+    background:transparent;
+    border:2px solid #9bbc0f;
+    color:#9bbc0f;
+    font-family:"Courier New",monospace;
+    font-size:13px;
+    width:80%;
+    padding:8px 0;
+    border-radius:5px;
+    cursor:pointer;
+    letter-spacing:1px;
+}
+
+.menuBtn:active,
+.menuBtn:hover{
+    background:#9bbc0f;
+    color:#0f380f;
+}
+
+/* D-PAD CUSTOMIZE PANEL */
+#dpadPanel{
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    width:100%;
+}
+
+#dpadPanel.open{
+    display:flex;
+}
+
+.dpadLabel{
+    font-size:11px;
+    letter-spacing:1px;
+    color:#9bbc0f;
+    margin-bottom:2px;
+}
+
+.sizeRow{
+    display:flex;
+    gap:8px;
+}
+
+.sizeOpt{
+    background:transparent;
+    border:2px solid #9bbc0f;
+    color:#9bbc0f;
+    font-family:"Courier New",monospace;
+    font-size:11px;
+    padding:5px 10px;
+    border-radius:4px;
+    cursor:pointer;
+}
+
+.sizeOpt.active,
+.sizeOpt:hover{
+    background:#9bbc0f;
+    color:#0f380f;
+}
+
+.posRow{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    width:80%;
+}
+
+#posSlider{
+    width:100%;
+    accent-color:#9bbc0f;
+}
+
+.backBtn{
+    background:transparent;
+    border:1px solid #9bbc0f;
+    color:#9bbc0f;
+    font-family:"Courier New",monospace;
+    font-size:11px;
+    padding:5px 16px;
+    border-radius:4px;
+    cursor:pointer;
+    margin-top:4px;
+}
+
+.backBtn:hover{
+    background:#9bbc0f;
+    color:#0f380f;
+}
+
 /* BUTTON AREA */
 .controls{
     margin-top:15px;
 }
 
-/* D PAD */
-.dpad{
-    display:grid;
-    grid-template-columns:60px 60px 60px;
-    grid-template-rows:60px 60px 60px;
-    gap:8px;
+/* SYSTEM BUTTONS ROW */
+.sysRow{
+    display:flex;
     justify-content:center;
-    margin-top:10px;
+    gap:8px;
+    margin-bottom:8px;
 }
 
-.btn{
+.sysBtn{
     background:#444;
     border:none;
     color:white;
-    font-size:22px;
-    border-radius:8px;
+    font-family:"Courier New",monospace;
+    font-size:11px;
+    padding:6px 14px;
+    border-radius:6px;
+    cursor:pointer;
 }
 
-.btn:active{
-    background:#777;
+.sysBtn:active{ background:#777; }
+
+.sysBtn.menuTrigger{
+    background:#1a3a1a;
+    border:2px solid #4a8a4a;
+    color:#9bbc0f;
 }
 
-/* BOOST CENTER BUTTON */
+.sysBtn.menuTrigger:active{ background:#2a5a2a; }
+
+/* BOOST BUTTON */
 .boost{
     background:#2196f3;
     color:white;
     border:none;
+    font-family:"Courier New",monospace;
     padding:8px 20px;
-    margin-top:10px;
+    margin-bottom:8px;
     border-radius:6px;
+    cursor:pointer;
 }
+
+.boost:active{ background:#1565c0; }
+
+/* D-PAD */
+#dpadWrap{
+    display:flex;
+    justify-content:center;
+    transition:margin-left 0.2s;
+}
+
+.dpad{
+    display:grid;
+    gap:6px;
+    justify-content:center;
+}
+
+.dpadBtn{
+    background:#444;
+    border:none;
+    color:white;
+    border-radius:8px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.dpadBtn:active{ background:#777; }
 </style>
 </head>
 
@@ -99,6 +259,7 @@ canvas{
 
 <div class="device">
 
+    <!-- SCREEN -->
     <div class="screen">
 
         <div class="title">SNAKE EVO</div>
@@ -110,29 +271,73 @@ canvas{
             <span>SCORE <span id="score">0</span></span>
         </div>
 
+        <!-- MENU OVERLAY (sits over the screen) -->
+        <div id="menuOverlay">
+
+            <!-- MAIN MENU -->
+            <div id="mainMenu">
+                <div class="menuTitle">MENU</div>
+                <button class="menuBtn" onclick="menuPlay()">▶ PLAY</button>
+                <button class="menuBtn" onclick="menuPause()">⏸ PAUSE</button>
+                <button class="menuBtn" onclick="menuRestart()">↺ RESTART</button>
+                <button class="menuBtn" onclick="openDpadPanel()">⊞ CUSTOMIZE D-PAD</button>
+                <button class="menuBtn" onclick="closeMenu()">✕ CLOSE</button>
+            </div>
+
+            <!-- D-PAD CUSTOMIZE PANEL -->
+            <div id="dpadPanel">
+                <div class="menuTitle">D-PAD</div>
+
+                <div class="dpadLabel">BUTTON SIZE</div>
+                <div class="sizeRow">
+                    <button class="sizeOpt" id="sizeS" onclick="setDpadSize('S')">SMALL</button>
+                    <button class="sizeOpt active" id="sizeM" onclick="setDpadSize('M')">MED</button>
+                    <button class="sizeOpt" id="sizeL" onclick="setDpadSize('L')">LARGE</button>
+                </div>
+
+                <div class="dpadLabel" style="margin-top:10px">POSITION</div>
+                <div class="posRow">
+                    <input id="posSlider" type="range" min="-80" max="80" value="0"
+                           oninput="setDpadPos(this.value)">
+                    <span id="posLabel" style="font-size:10px;color:#9bbc0f">CENTER</span>
+                </div>
+
+                <button class="backBtn" onclick="closeDpadPanel()">◄ BACK</button>
+            </div>
+
+        </div>
+
     </div>
 
+    <!-- CONTROLS -->
     <div class="controls">
-        <button onclick="startGame()">START</button>
-        <button onclick="pauseGame()">PAUSE</button>
 
-        <br>
-
-        <button class="boost" onclick="boost()">BOOST</button>
-
-        <div class="dpad">
-            <div></div>
-            <button class="btn" onclick="setDir('up')">▲</button>
-            <div></div>
-
-            <button class="btn" onclick="setDir('left')">◄</button>
-            <div></div>
-            <button class="btn" onclick="setDir('right')">►</button>
-
-            <div></div>
-            <button class="btn" onclick="setDir('down')">▼</button>
-            <div></div>
+        <!-- SYSTEM BUTTONS -->
+        <div class="sysRow">
+            <button class="sysBtn" onclick="startGame()">START</button>
+            <button class="sysBtn menuTrigger" onclick="openMenu()">MENU</button>
         </div>
+
+        <!-- BOOST -->
+        <button class="boost" onclick="boost()">● BOOST</button>
+
+        <!-- D-PAD -->
+        <div id="dpadWrap">
+            <div class="dpad" id="dpad">
+                <div></div>
+                <button class="dpadBtn" onclick="setDir('up')">▲</button>
+                <div></div>
+
+                <button class="dpadBtn" onclick="setDir('left')">◄</button>
+                <div></div>
+                <button class="dpadBtn" onclick="setDir('right')">►</button>
+
+                <div></div>
+                <button class="dpadBtn" onclick="setDir('down')">▼</button>
+                <div></div>
+            </div>
+        </div>
+
     </div>
 
 </div>
@@ -142,22 +347,16 @@ let canvas=document.getElementById("game");
 let ctx=canvas.getContext("2d");
 
 let grid=15;
-
 let snake=[{x:10,y:10}];
 let food={x:5,y:5};
-
-let dx=0;
-let dy=0;
-
-let score=0;
-let level=1;
-
+let dx=0, dy=0;
+let score=0, level=1;
 let speed=300;
 let running=false;
-let timer;
+let timer=null;
 
+/* ── DRAW ── */
 function draw(){
-
     ctx.fillStyle="#8bac0f";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
@@ -170,14 +369,11 @@ function draw(){
     ctx.fillRect(food.x*grid,food.y*grid,grid-2,grid-2);
 }
 
+/* ── UPDATE ── */
 function update(){
-
     if(!running)return;
 
-    let head={
-        x:snake[0].x+dx,
-        y:snake[0].y+dy
-    };
+    let head={x:snake[0].x+dx, y:snake[0].y+dy};
 
     if(head.x<0||head.y<0||head.x>=20||head.y>=20){
         gameOver();
@@ -187,22 +383,17 @@ function update(){
     snake.unshift(head);
 
     if(head.x===food.x && head.y===food.y){
-
         score+=10;
-
         if(score%50===0){
             level++;
-            speed-=20;
+            speed=Math.max(80,speed-20);
         }
-
         food={
             x:Math.floor(Math.random()*20),
             y:Math.floor(Math.random()*20)
         };
-
         document.getElementById("score").innerText=score;
         document.getElementById("level").innerText=level;
-
     }else{
         snake.pop();
     }
@@ -210,11 +401,13 @@ function update(){
     draw();
 }
 
+/* ── LOOP ── */
 function loop(){
     update();
     timer=setTimeout(loop,speed);
 }
 
+/* ── START ── */
 function startGame(){
     if(!running){
         running=true;
@@ -222,30 +415,129 @@ function startGame(){
     }
 }
 
+/* ── PAUSE ── */
 function pauseGame(){
     running=false;
+    clearTimeout(timer);
 }
 
+/* ── RESUME ── */
+function resumeGame(){
+    if(!running){
+        running=true;
+        loop();
+    }
+}
+
+/* ── RESTART ── */
+function restartGame(){
+    clearTimeout(timer);
+    snake=[{x:10,y:10}];
+    food={x:5,y:5};
+    dx=0; dy=0;
+    score=0; level=1; speed=300;
+    document.getElementById("score").innerText=0;
+    document.getElementById("level").innerText=1;
+    running=true;
+    loop();
+}
+
+/* ── GAME OVER ── */
 function gameOver(){
     running=false;
-    alert("Game Over");
+    clearTimeout(timer);
+    ctx.fillStyle="rgba(15,56,15,0.75)";
+    ctx.fillRect(0,0,300,300);
+    ctx.fillStyle="#9bbc0f";
+    ctx.font="bold 20px 'Courier New'";
+    ctx.textAlign="center";
+    ctx.fillText("GAME OVER",150,130);
+    ctx.font="14px 'Courier New'";
+    ctx.fillText("SCORE: "+score,150,158);
+    ctx.fillText("LEVEL: "+level,150,178);
+    ctx.font="11px 'Courier New'";
+    ctx.fillText("press START",150,210);
 }
 
+/* ── CONTROLS ── */
 function setDir(dir){
-
-    if(dir==="up"){dx=0;dy=-1;}
-    if(dir==="down"){dx=0;dy=1;}
-    if(dir==="left"){dx=-1;dy=0;}
-    if(dir==="right"){dx=1;dy=0;}
+    if(dir==="up"   && dy===0){dx=0;dy=-1;}
+    if(dir==="down" && dy===0){dx=0;dy=1;}
+    if(dir==="left" && dx===0){dx=-1;dy=0;}
+    if(dir==="right"&& dx===0){dx=1;dy=0;}
 }
 
 function boost(){
+    let prev=speed;
     speed=50;
-    setTimeout(()=>{
-        speed=200;
-    },1000);
+    setTimeout(()=>{ speed=prev; },1000);
 }
 
+/* ── MENU ── */
+function openMenu(){
+    pauseGame();
+    document.getElementById("menuOverlay").classList.add("open");
+    document.getElementById("mainMenu").style.display="";
+    document.getElementById("dpadPanel").classList.remove("open");
+}
+
+function closeMenu(){
+    document.getElementById("menuOverlay").classList.remove("open");
+}
+
+function menuPlay(){
+    closeMenu();
+    resumeGame();
+}
+
+function menuPause(){
+    pauseGame();
+    closeMenu();
+}
+
+function menuRestart(){
+    closeMenu();
+    restartGame();
+}
+
+/* ── D-PAD PANEL ── */
+function openDpadPanel(){
+    document.getElementById("mainMenu").style.display="none";
+    document.getElementById("dpadPanel").classList.add("open");
+}
+
+function closeDpadPanel(){
+    document.getElementById("mainMenu").style.display="";
+    document.getElementById("dpadPanel").classList.remove("open");
+}
+
+let dpadSizes={S:40, M:60, L:80};
+let currentSize="M";
+
+function setDpadSize(s){
+    currentSize=s;
+    let px=dpadSizes[s];
+    let dpad=document.getElementById("dpad");
+    dpad.style.gridTemplateColumns=px+"px "+px+"px "+px+"px";
+    dpad.style.gridTemplateRows=px+"px "+px+"px "+px+"px";
+    document.querySelectorAll(".dpadBtn").forEach(b=>{
+        b.style.fontSize=(px*0.35)+"px";
+    });
+    ["S","M","L"].forEach(k=>{
+        document.getElementById("size"+k).classList.toggle("active",k===s);
+    });
+}
+
+function setDpadPos(val){
+    document.getElementById("dpadWrap").style.marginLeft=val+"px";
+    let lbl=document.getElementById("posLabel");
+    if(val==0)     lbl.innerText="CENTER";
+    else if(val<0) lbl.innerText="LEFT "+Math.abs(val)+"px";
+    else           lbl.innerText="RIGHT "+val+"px";
+}
+
+/* init dpad size to medium */
+setDpadSize("M");
 draw();
 </script>
 
