@@ -119,6 +119,19 @@ canvas{
 .tutIcon.E{ color:#aabbaa; border-color:#aabbaa; }
 .tutIcon.F{ color:#cc3322; border-color:#cc3322; }
 
+.tutBadge{
+    display:inline-block;
+    background:#306230;
+    color:#9bbc0f;
+    font-size:9px;
+    font-weight:bold;
+    padding:1px 5px;
+    border-radius:3px;
+    border:1px solid #9bbc0f;
+    vertical-align:middle;
+    letter-spacing:1px;
+}
+
 .tutNav{
     display:flex;
     justify-content:space-between;
@@ -266,12 +279,16 @@ canvas{
     align-items:center;
     gap:6px;
 }
-.leaderboard h3 .live-dot{
-    width:7px;height:7px;
-    background:#ff4444;
+.live-dot{
+    width:6px;height:6px;
+    background:#44ff44;
     border-radius:50%;
     display:inline-block;
     animation:blink 1s infinite;
+}
+.leaderboard h3 .live-dot{
+    width:7px;height:7px;
+    background:#ff4444;
 }
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
 #lbList{
@@ -497,7 +514,7 @@ canvas{
         <div class="info">
             <span>HIGH SCORE <span id="highscore">0</span></span>
             <span>PREY <span id="prey">0</span>/16</span>
-            <span>&#162;<span id="coins">0</span></span>
+            <span>COIN <span id="coins">0</span></span>
         </div>
 
         <!-- TUTORIAL OVERLAY -->
@@ -511,15 +528,15 @@ canvas{
                 </div>
                 <div class="tutRow">
                     <span class="tutIcon">F</span>
-                    <span>Each food = 5 pts &amp; 5 coins. Eat 16 prey to clear the level.</span>
+                    <span>Each food = 5 points &amp; 5 coins. Eat more to grow and level up. <span class="tutBadge">+5pts</span></span>
                 </div>
                 <div class="tutRow">
                     <span class="tutIcon">X</span>
-                    <span>Hit a wall or yourself = GAME OVER. Walls wrap around all sides.</span>
+                    <span>Hit a wall or yourself and it is GAME OVER. Score resets to zero.</span>
                 </div>
                 <div class="tutRow">
-                    <span class="tutIcon">&#9679;</span>
-                    <span>Tap the center button for a 1-second BOOST of speed!</span>
+                    <span class="tutIcon">P</span>
+                    <span>Press PAUSE to resume, see leaderboard or change controls.</span>
                 </div>
                 <div class="tutNav">
                     <span onclick="skipTutorial()">SKIP</span>
@@ -532,7 +549,7 @@ canvas{
                 <div class="tutRow"><span class="tutIcon S">S</span><span>Extra life stored (max 3) — fastest clear</span></div>
                 <div class="tutRow"><span class="tutIcon A">A</span><span>Ghost mode: pass through your own body</span></div>
                 <div class="tutRow"><span class="tutIcon B">B</span><span>Obstacle pass: go through wall blocks</span></div>
-                <div class="tutRow"><span class="tutIcon C">C</span><span>Score ×1.5 multiplier for next level</span></div>
+                <div class="tutRow"><span class="tutIcon C">C</span><span>Coins ×1.5 multiplier for next level</span></div>
                 <div class="tutRow"><span class="tutIcon D">D</span><span>Speed hold: keep current speed next level</span></div>
                 <div class="tutRow"><span class="tutIcon E">E</span><span>+5 bonus coins for effort</span></div>
                 <div class="tutRow"><span class="tutIcon F">F</span><span>Hit wall or yourself = GAME OVER (spend ♥ to survive)</span></div>
@@ -623,16 +640,16 @@ canvas{
 <!-- STATS BAR BELOW DEVICE -->
 <div class="statsBar">
     <div class="statCol">
+        <span class="statLabel">REGISTERED</span>
         <span class="statVal" id="statReg">0</span>
-        <span class="statLabel">Registered Players</span>
     </div>
     <div class="statCol">
+        <span class="statLabel"><span class="live-dot"></span> ACTIVE</span>
         <span class="statVal" id="statActive">0</span>
-        <span class="statLabel">Active Now</span>
     </div>
     <div class="statCol">
+        <span class="statLabel">BEST SCORE</span>
         <span class="statVal" id="statBest">—</span>
-        <span class="statLabel">Highest Score<br>in the Game</span>
     </div>
 </div>
 
@@ -652,8 +669,8 @@ const ctx    = canvas.getContext('2d');
 
 const COLS = 20, ROWS = 20, CELL = 15;
 const PREY_PER_LEVEL = 16;
-const PREY_PTS        = 1;  // score: 1 point per prey
-const PREY_COINS      = 5;  // coins: 5 per prey (unchanged)
+const PREY_PTS        = 5;  // score: 5 points per prey
+const PREY_COINS      = 5;  // coins: 5 per prey
 const LEVEL_BONUS_PTS  = 1;  // +1 score on level clear
 const LEVEL_BONUS_COINS= 5;  // +5 coins on level clear
 
@@ -891,7 +908,7 @@ function getGrade(secs) {
 function rewardLabel(g) {
     return ({
         S:'EXTRA LIFE', A:'GHOST MODE', B:'OBSTACLE PASS',
-        C:'1.5x SCORE', D:'SPEED HOLD', E:'KEEP IT UP!', F:'YOU LOSE'
+        C:'1.5x COINS', D:'SPEED HOLD', E:'KEEP IT UP!', F:'YOU LOSE'
     })[g] || '';
 }
 
@@ -900,7 +917,7 @@ function rewardDesc(g) {
         S:'One free death stored (\u2665 max 3)',
         A:'Pass through your own body',
         B:'Pass through obstacle walls',
-        C:'Score \xd71.5 next level',
+        C:'Coins \xd71.5 next level',
         D:'Next level keeps this speed',
         E:'+5 bonus coins for effort',
         F:'Too slow \u2014 game resets (spend \u2665 to survive)'
@@ -989,7 +1006,7 @@ function draw() {
     if (obstPassActive && Date.now() < obstPassEnd)
         hud.push({ text: 'PASS '+Math.ceil((obstPassEnd-Date.now())/1000)+'s', col: '#44aaff' });
     if (mult > 1.0 && Date.now() < multEnd)
-        hud.push({ text: mult+'x '+Math.ceil((multEnd-Date.now())/1000)+'s', col: '#ffcc44' });
+        hud.push({ text: 'COINS '+mult+'x '+Math.ceil((multEnd-Date.now())/1000)+'s', col: '#ffcc44' });
 
     if (hud.length) {
         let bw = 92, bh = hud.length*14+6;
@@ -1036,7 +1053,7 @@ function doLevelClear() {
     ctx.fillStyle = '#9bbc0f';
     ctx.font = '11px "Courier New"';
     ctx.fillText('TIME: '+elapsed.toFixed(1)+'s', 150, 148);
-    ctx.fillText('SCORE: '+score+'  \u00A2'+coins, 150, 164);
+    ctx.fillText('SCORE: '+score+'  COIN '+coins, 150, 164);
 
     ctx.font = 'bold 12px "Courier New"';
     ctx.fillStyle = GRADE_COLORS[lastGrade] || '#9bbc0f';
@@ -1067,7 +1084,7 @@ function doGameOver() {
     ctx.fillText('GAME OVER', 150, 108);
     ctx.font = '13px "Courier New"';
     ctx.fillText('LV '+level+'  SCORE '+score, 150, 142);
-    ctx.fillText('\u00A2'+coins+' COINS', 150, 162);
+    ctx.fillText('COINS: '+coins, 150, 162);
     ctx.font = '11px "Courier New"';
     ctx.fillText('press START to retry', 150, 210);
 }
@@ -1112,7 +1129,7 @@ function drawWin() {
     ctx.fillStyle = '#9bbc0f';
     ctx.fillText('100 LEVELS COMPLETE', 150, 122);
     ctx.fillText('FINAL SCORE: '+score, 150, 146);
-    ctx.fillText('\u00A2'+coins+' COINS EARNED', 150, 166);
+    ctx.fillText('COINS EARNED: '+coins, 150, 166);
     ctx.font = '11px "Courier New"';
     ctx.fillText('press START to play again', 150, 220);
 }
@@ -1221,7 +1238,7 @@ function update() {
     snake.unshift(head);
 
     if (head.x === food.x && head.y === food.y) {
-        let pts = PREY_PTS;                       // always 1 per prey
+        let pts = PREY_PTS;
         let cts = Math.round(PREY_COINS * mult);
         score += pts; coins += cts; preyEaten++;
         food = spawnFood();
