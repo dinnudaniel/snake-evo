@@ -213,19 +213,12 @@ canvas{
 
 .sysBtn.menuTrigger:active{ background:#2a5a2a; }
 
-/* BOOST BUTTON */
+/* BOOST CENTER BUTTON */
 .boost{
-    background:#2196f3;
-    color:white;
-    border:none;
-    font-family:"Courier New",monospace;
-    padding:8px 20px;
-    margin-bottom:8px;
-    border-radius:6px;
-    cursor:pointer;
+    background:#2196f3 !important;
+    color:white !important;
+    border-radius:50% !important;
 }
-
-.boost:active{ background:#1565c0; }
 
 /* D-PAD */
 #dpadWrap{
@@ -318,10 +311,7 @@ canvas{
             <button class="sysBtn menuTrigger" onclick="openMenu()">MENU</button>
         </div>
 
-        <!-- BOOST -->
-        <button class="boost" onclick="boost()">● BOOST</button>
-
-        <!-- D-PAD -->
+        <!-- D-PAD with BOOST in center -->
         <div id="dpadWrap">
             <div class="dpad" id="dpad">
                 <div></div>
@@ -329,7 +319,7 @@ canvas{
                 <div></div>
 
                 <button class="dpadBtn" onclick="setDir('left')">◄</button>
-                <div></div>
+                <button class="dpadBtn boost" id="boostBtn" onclick="boost()">●</button>
                 <button class="dpadBtn" onclick="setDir('right')">►</button>
 
                 <div></div>
