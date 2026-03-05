@@ -675,57 +675,50 @@ const GRADE_COLORS = {
 };
 
 // ══════════════════════════════════════════════════════
-// SNAKE SPECIES EVOLUTION (Level 3+)
+// SNAKE SPECIES EVOLUTION (Level 2+, new species every 2 levels)
+// 50 species: index 0=L2-3, 1=L4-5, ..., 49=L100
 // ══════════════════════════════════════════════════════
 const SPECIES = [
-    null, null,
-    'EGG-EATING SNAKE','RING-NECKED SNAKE','SMOOTH GREEN SNAKE',
-    'GARTER SNAKE','RIBBON SNAKE','MILK SNAKE','CORN SNAKE','KING SNAKE',
-    'RAT SNAKE','BULL SNAKE','COACHWHIP','INDIGO SNAKE','HOGNOSE SNAKE',
-    'RACER SNAKE','NIGHT SNAKE','VINE SNAKE','MUD SNAKE','FLYING SNAKE',
-    'CAT-EYED SNAKE','MANGROVE SNAKE','BANDED TREE SNAKE','RAINBOW SNAKE',
-    'WATER MOCCASIN','COPPERHEAD','SIDEWINDER','PYGMY RATTLESNAKE',
-    'MASSASAUGA','TIMBER RATTLESNAKE',
-    'WESTERN DIAMONDBACK','EASTERN DIAMONDBACK','FER-DE-LANCE','BUSHMASTER',
-    'GABOON VIPER','PUFF ADDER','SAW-SCALED VIPER',"RUSSELL'S VIPER",
-    'HORNED VIPER','BOOMSLANG',
-    'TWIG SNAKE','STILETTO SNAKE','NIGHT ADDER','CAPE COBRA','FOREST COBRA',
-    'EGYPTIAN COBRA','INDIAN COBRA','MONOCLED COBRA','SPITTING COBRA','KING COBRA',
-    'GREEN MAMBA',"JAMESON'S MAMBA",'EASTERN GREEN MAMBA','BLACK MAMBA',
-    'COMMON KRAIT','BANDED KRAIT','INDIAN KRAIT','SEA KRAIT',
-    'YELLOW SEA SNAKE','OLIVE SEA SNAKE',
-    'BEAKED SEA SNAKE','TIGER SNAKE','AUSTRALIAN COPPERHEAD','EASTERN BROWN SNAKE',
-    'COASTAL TAIPAN','INLAND TAIPAN','DEATH ADDER','MULGA SNAKE',
-    'TIGER RATTLESNAKE','MOJAVE RATTLESNAKE',
-    'SPECKLED RATTLESNAKE','RED DIAMOND RATTLER','PACIFIC RATTLESNAKE',
-    'BALL PYTHON','BLOOD PYTHON','CARPET PYTHON','GREEN TREE PYTHON',
-    'AMETHYSTINE PYTHON','AFRICAN ROCK PYTHON','BURMESE PYTHON',
-    'RETICULATED PYTHON','YELLOW ANACONDA','DARK-SPOTTED ANACONDA',
-    'BOLIVIAN ANACONDA','BENI ANACONDA','HAIRY BUSH VIPER',
-    "EYELASH PALM PIT VIPER","WAGLER'S PIT VIPER",'BAMBOO PIT VIPER',
-    'WHITE-LIPPED PIT VIPER',
-    "POPE'S PIT VIPER",'MALAYAN PIT VIPER','CHAIN VIPER',"FEA'S VIPER",
-    'HUNDRED PACER','MANY-BANDED KRAIT','LONG-GLANDED CORAL SNAKE',
-    'BANDED SEA KRAIT','OLIVE PYTHON','GREEN ANACONDA'
+    // Tier 0 — harmless (L2-11)
+    'EGG-EATING SNAKE','RING-NECKED SNAKE','GARTER SNAKE','SMOOTH GREEN SNAKE','CORN SNAKE',
+    // Tier 1 — mild constrictors (L12-21)
+    'MILK SNAKE','KING SNAKE','BULL SNAKE','RAT SNAKE','HOG-NOSED SNAKE',
+    // Tier 2 — fast/rear-fanged (L22-31)
+    'COACHWHIP','INDIGO SNAKE','RACER SNAKE','VINE SNAKE','FLYING SNAKE',
+    // Tier 3 — mildly venomous (L32-41)
+    'CAT-EYED SNAKE','MANGROVE SNAKE','RAINBOW SNAKE','NIGHT SNAKE','BOOMSLANG',
+    // Tier 4 — pit vipers (L42-51)
+    'WATER MOCCASIN','COPPERHEAD','SIDEWINDER','TIMBER RATTLESNAKE','WESTERN DIAMONDBACK',
+    // Tier 5 — dangerous vipers (L52-61)
+    'EASTERN DIAMONDBACK','FER-DE-LANCE','BUSHMASTER','GABOON VIPER','SAW-SCALED VIPER',
+    // Tier 6 — cobras (L62-71)
+    'CAPE COBRA','EGYPTIAN COBRA','INDIAN COBRA','MONOCLED COBRA','KING COBRA',
+    // Tier 7 — mambas & kraits (L72-81)
+    'GREEN MAMBA','BLACK MAMBA','COMMON KRAIT','BANDED KRAIT','TIGER SNAKE',
+    // Tier 8 — taipans & death adders (L82-91)
+    'INLAND TAIPAN','EASTERN BROWN SNAKE','COASTAL TAIPAN','DEATH ADDER','MULGA SNAKE',
+    // Tier 9 — apex constrictors (L92-100)
+    'BALL PYTHON','BURMESE PYTHON','AFRICAN ROCK PYTHON','RETICULATED PYTHON','GREEN ANACONDA'
 ];
+// [headColor, bodyColor, eyeColor] — 10 tiers, 5 species each
 const SPECIES_TIERS = [
-    ['#2a7a2a','#1a5a1a','#88ff88'], // T0 L3-12   harmless greens
-    ['#6a6a1a','#3a3808','#dddd44'], // T1 L13-22  olive
-    ['#7a5a1a','#4a2808','#ddaa44'], // T2 L23-32  brown
-    ['#8a5a1a','#4a2808','#ffaa33'], // T3 L33-42  orange-brown
-    ['#8a3a1a','#4a1008','#ff6633'], // T4 L43-52  venomous orange
-    ['#6a1a1a','#3a0808','#ff4444'], // T5 L53-62  deadly red
-    ['#4a1a4a','#200820','#cc44cc'], // T6 L63-72  dark purple
-    ['#1a1a4a','#080820','#5555ee'], // T7 L73-82  python blue
-    ['#1a3a3a','#081818','#44cccc'], // T8 L83-92  anaconda teal
-    ['#101010','#080808','#ffcc00'], // T9 L93-100 apex black/gold
+    ['#3a8c3a','#1a5a1a','#aaffaa'], // T0  harmless greens
+    ['#6a8c2a','#2a4a0a','#ccff44'], // T1  yellow-green
+    ['#7a6c2a','#3a3808','#ddcc44'], // T2  olive
+    ['#8a6a1a','#4a2808','#ddaa44'], // T3  brown
+    ['#9a5c1a','#4a2808','#ffaa33'], // T4  orange rattlers
+    ['#9a3a1a','#5a1808','#ff6633'], // T5  dangerous vipers
+    ['#7a1a1a','#3a0808','#ff4444'], // T6  cobras red
+    ['#4a1a4a','#200820','#dd44dd'], // T7  mambas purple
+    ['#1a2a4a','#080a20','#4488ff'], // T8  taipan blue
+    ['#141414','#080808','#ffcc00'], // T9  apex black/gold
 ];
 function getSpeciesData(lv) {
-    if (!lv || lv < 3) return { name:null, head:'#1e6a1e', body:'#0f380f', eye:'#9bbc0f' };
-    let name = SPECIES[lv - 1] || null;
-    let tier = Math.min(Math.floor((lv - 3) / 10), 9);
+    if (!lv || lv < 2) return { name:null, head:'#1e6a1e', body:'#0f380f', eye:'#9bbc0f' };
+    let idx = Math.min(Math.floor((lv - 2) / 2), SPECIES.length - 1);
+    let tier = Math.min(Math.floor(idx / 5), 9);
     let [head, body, eye] = SPECIES_TIERS[tier];
-    return { name, head, body, eye };
+    return { name: SPECIES[idx], head, body, eye };
 }
 
 // ══════════════════════════════════════════════════════
@@ -1021,21 +1014,111 @@ function draw() {
     ctx.fillStyle = '#5aaa5a';
     ctx.fillRect(food.x*CELL+2, food.y*CELL+2, 3, 3);
 
-    // Snake — semi-transparent when ghost active
+    // Snake — real graphical rendering
     const sp = getSpeciesData(level);
     ctx.globalAlpha = ghostActive ? 0.38 : 1.0;
-    snake.forEach((s, i) => {
-        ctx.fillStyle = i === 0 ? sp.head : sp.body;
-        ctx.fillRect(s.x*CELL+1, s.y*CELL+1, CELL-3, CELL-3);
-        if (i === 0) {
-            ctx.fillStyle = ghostActive ? '#ccff44' : sp.eye;
-            ctx.fillRect(s.x*CELL+3, s.y*CELL+3, 2, 2);
-            ctx.fillRect(s.x*CELL+8, s.y*CELL+3, 2, 2);
+
+    if (snake.length > 0) {
+        const H = CELL / 2;      // center offset = 7.5
+        const bw = CELL - 4;     // body tube width = 11
+
+        // 1. Dark outline for depth
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineWidth = bw + 3;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        snake.forEach((s, i) => {
+            i === 0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+        });
+        ctx.stroke();
+
+        // 2. Body fill
+        ctx.strokeStyle = sp.body;
+        ctx.lineWidth = bw;
+        ctx.beginPath();
+        snake.forEach((s, i) => {
+            i === 0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+        });
+        ctx.stroke();
+
+        // 3. Spine highlight stripe (lighter centre line)
+        ctx.strokeStyle = sp.head;
+        ctx.lineWidth = Math.max(2, bw - 7);
+        ctx.beginPath();
+        snake.forEach((s, i) => {
+            i === 0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+        });
+        ctx.stroke();
+
+        // 4. Scale dot texture every other body segment
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        for (let i = 2; i < snake.length - 1; i += 2) {
+            ctx.beginPath();
+            ctx.arc(snake[i].x*CELL+H, snake[i].y*CELL+H, 1.8, 0, Math.PI*2);
+            ctx.fill();
         }
-    });
+
+        // 5. Head — distinct filled rectangle on top
+        const h = snake[0];
+        ctx.fillStyle = sp.head;
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(h.x*CELL+1, h.y*CELL+1, CELL-2, CELL-2, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        // 6. Eyes — direction-aware
+        const eyeCol = ghostActive ? '#ccff44' : sp.eye;
+        let e1x, e1y, e2x, e2y;
+        if (dx === 1) {
+            e1x = h.x*CELL+11; e1y = h.y*CELL+4;
+            e2x = h.x*CELL+11; e2y = h.y*CELL+11;
+        } else if (dx === -1) {
+            e1x = h.x*CELL+4;  e1y = h.y*CELL+4;
+            e2x = h.x*CELL+4;  e2y = h.y*CELL+11;
+        } else if (dy === 1) {
+            e1x = h.x*CELL+4;  e1y = h.y*CELL+11;
+            e2x = h.x*CELL+11; e2y = h.y*CELL+11;
+        } else {
+            e1x = h.x*CELL+4;  e1y = h.y*CELL+4;
+            e2x = h.x*CELL+11; e2y = h.y*CELL+4;
+        }
+        ctx.fillStyle = eyeCol;
+        ctx.beginPath(); ctx.arc(e1x, e1y, 2.2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(e2x, e2y, 2.2, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(e1x, e1y, 1.1, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(e2x, e2y, 1.1, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.beginPath(); ctx.arc(e1x-0.5, e1y-0.5, 0.6, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(e2x-0.5, e2y-0.5, 0.6, 0, Math.PI*2); ctx.fill();
+
+        // 7. Tongue — forked, flicking animation
+        if (Date.now() % 700 < 350) {
+            ctx.strokeStyle = '#cc1111';
+            ctx.lineWidth = 1;
+            ctx.lineCap = 'round';
+            const tx = h.x*CELL+H, ty = h.y*CELL+H;
+            let bx, by, f1x, f1y, f2x, f2y;
+            if (dx === 1) {
+                bx=tx+9; by=ty; f1x=bx+4; f1y=by-2; f2x=bx+4; f2y=by+2;
+            } else if (dx === -1) {
+                bx=tx-9; by=ty; f1x=bx-4; f1y=by-2; f2x=bx-4; f2y=by+2;
+            } else if (dy === 1) {
+                bx=tx; by=ty+9; f1x=bx-2; f1y=by+4; f2x=bx+2; f2y=by+4;
+            } else {
+                bx=tx; by=ty-9; f1x=bx-2; f1y=by-4; f2x=bx+2; f2y=by-4;
+            }
+            ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(bx,by); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(f1x,f1y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(f2x,f2y); ctx.stroke();
+        }
+    }
     ctx.globalAlpha = 1.0;
 
-    // Species name (bottom-right, level 3+)
+    // Species name (bottom-right, level 2+)
     if (sp.name) {
         ctx.font = '7px "Courier New"';
         ctx.textAlign = 'right';
