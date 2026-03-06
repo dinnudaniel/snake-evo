@@ -701,25 +701,66 @@ const SPECIES = [
     // Tier 9 — apex constrictors (L92-100)
     'BALL PYTHON','BURMESE PYTHON','AFRICAN ROCK PYTHON','RETICULATED PYTHON','GREEN ANACONDA'
 ];
-// [headColor, bodyColor, eyeColor] — 10 tiers, change every 2 species (every 4 levels)
-const SPECIES_TIERS = [
-    ['#22ee22','#0a6a0a','#aaffaa'], // T0  neon green    (L2-5)
-    ['#ccdd00','#5a5a00','#ffff66'], // T1  yellow        (L6-9)
-    ['#ff9900','#7a3300','#ffcc66'], // T2  orange        (L10-13)
-    ['#ff4400','#8a1500','#ff8866'], // T3  red-orange    (L14-17)
-    ['#ee0000','#770000','#ff6666'], // T4  red           (L18-21)
-    ['#cc0044','#660022','#ff4488'], // T5  crimson       (L22-25)
-    ['#9900cc','#4a0066','#dd66ff'], // T6  purple        (L26-29)
-    ['#5500ff','#220088','#9966ff'], // T7  violet        (L30-33)
-    ['#0044ff','#001a88','#6688ff'], // T8  blue          (L34-37)
-    ['#111111','#050505','#ffcc00'], // T9  black/gold    (L38+)
-];
+// Per-species real-world colors: [head, body, patternColor, eye]
+const SPECIES_COLORS = {
+  'EGG-EATING SNAKE':    ['#9aaa6a','#6a7a4a','#2a3a1a','#ddcc44'],
+  'RING-NECKED SNAKE':   ['#222233','#121220','#ff8800','#ffdd44'],
+  'GARTER SNAKE':        ['#4a5a1a','#2a3a08','#ddcc00','#99dd44'],
+  'SMOOTH GREEN SNAKE':  ['#55dd44','#33bb22','#aaff88','#ffff88'],
+  'CORN SNAKE':          ['#dd4422','#bb2200','#111111','#ffcc88'],
+  'MILK SNAKE':          ['#cc2222','#aa1100','#f8f8f8','#ffaa44'],
+  'KING SNAKE':          ['#0e0e0e','#060606','#ffee00','#ffee00'],
+  'BULL SNAKE':          ['#c8a460','#9a7840','#3a2000','#ffcc66'],
+  'RAT SNAKE':           ['#3a3a3a','#1c1c1c','#aaaaaa','#ccaa66'],
+  'HOG-NOSED SNAKE':     ['#b48040','#8a6020','#3a2000','#ffcc66'],
+  'COACHWHIP':           ['#2c1a08','#160a00','#9a7a50','#ccaa44'],
+  'INDIGO SNAKE':        ['#180838','#080018','#5544aa','#aaaaff'],
+  'RACER SNAKE':         ['#2a2a14','#141408','#7a7a44','#aabb44'],
+  'VINE SNAKE':          ['#228833','#114422','#55cc55','#ffff66'],
+  'FLYING SNAKE':        ['#229933','#115522','#ff3333','#ffff66'],
+  'CAT-EYED SNAKE':      ['#8a6a3a','#5a4018','#ccaa66','#ffcc00'],
+  'MANGROVE SNAKE':      ['#040404','#020202','#ffee00','#ffee00'],
+  'RAINBOW SNAKE':       ['#1a0828','#0a0018','#dd0000','#aaaaff'],
+  'NIGHT SNAKE':         ['#6a6a52','#4a4a38','#1a1a0a','#ffcc44'],
+  'BOOMSLANG':           ['#33661a','#1a4408','#aadd44','#88ff44'],
+  'WATER MOCCASIN':      ['#2c2c14','#161608','#9a9a6a','#dd9944'],
+  'COPPERHEAD':          ['#cc7722','#aa4400','#ffbb44','#ffcc66'],
+  'SIDEWINDER':          ['#d4aa55','#b08830','#6a4c18','#ddaa00'],
+  'TIMBER RATTLESNAKE':  ['#6a5a2a','#4a3a12','#110000','#ccaa44'],
+  'WESTERN DIAMONDBACK': ['#b4a070','#907840','#221200','#ffcc88'],
+  'EASTERN DIAMONDBACK': ['#aaa060','#887838','#201000','#ffcc88'],
+  'FER-DE-LANCE':        ['#6a4a2a','#4a2a08','#200800','#ffcc44'],
+  'BUSHMASTER':          ['#c07840','#8a5020','#380800','#ffaa44'],
+  'GABOON VIPER':        ['#c8a060','#9a6828','#550033','#ffcc44'],
+  'SAW-SCALED VIPER':    ['#c4a058','#9a7830','#3a1800','#ffcc44'],
+  'CAPE COBRA':          ['#cc9922','#aa7700','#442200','#ffee88'],
+  'EGYPTIAN COBRA':      ['#8a6a2a','#5a4008','#1c0800','#ffcc44'],
+  'INDIAN COBRA':        ['#7a6a3a','#4a4010','#180800','#ffcc66'],
+  'MONOCLED COBRA':      ['#5a5a38','#383818','#080800','#ffcc44'],
+  'KING COBRA':          ['#506a18','#304008','#c8aa00','#ffee44'],
+  'GREEN MAMBA':         ['#66cc22','#44aa00','#bbff44','#ffff44'],
+  'BLACK MAMBA':         ['#383828','#1c1c10','#5a5a40','#ffee44'],
+  'COMMON KRAIT':        ['#080808','#040404','#eeeeee','#ffffff'],
+  'BANDED KRAIT':        ['#141400','#0a0a00','#ffee00','#ffee00'],
+  'TIGER SNAKE':         ['#6a6a18','#484808','#ffee44','#ffee44'],
+  'INLAND TAIPAN':       ['#6a4828','#4a2808','#c8a860','#ffcc44'],
+  'EASTERN BROWN SNAKE': ['#7a5a28','#5a3808','#cca860','#ffcc44'],
+  'COASTAL TAIPAN':      ['#7a5828','#4a3008','#eeccaa','#ffcc44'],
+  'DEATH ADDER':         ['#5a5848','#3a3828','#ccaa60','#ffcc44'],
+  'MULGA SNAKE':         ['#6a4818','#4a2800','#ccaa55','#ffcc44'],
+  'BALL PYTHON':         ['#3a2818','#1c1008','#c8aa66','#cc9944'],
+  'BURMESE PYTHON':      ['#8a6838','#5a3808','#281200','#cc9944'],
+  'AFRICAN ROCK PYTHON': ['#7a6848','#4a4020','#180800','#cc9944'],
+  'RETICULATED PYTHON':  ['#7a5828','#4a3000','#180800','#cc9944'],
+  'GREEN ANACONDA':      ['#3a5c28','#1c3808','#1c2808','#cccc44'],
+};
 function getSpeciesData(lv) {
-    if (!lv || lv < 2) return { name:null, head:'#1e6a1e', body:'#0f380f', eye:'#9bbc0f' };
+    if (!lv || lv < 2) return { name:null, head:'#1e6a1e', body:'#0f380f', patternColor:'#0a2a0a', eye:'#9bbc0f', tier:0 };
     let idx = Math.min(Math.floor((lv - 2) / 2), SPECIES.length - 1);
-    let tier = Math.min(Math.floor(idx / 5), 9);  // 5 species per tier, 10 tiers
-    let [head, body, eye] = SPECIES_TIERS[tier];
-    return { name: SPECIES[idx], head, body, eye, tier };
+    let tier = Math.min(Math.floor(idx / 5), 9);
+    let name = SPECIES[idx];
+    let [head, body, patternColor, eye] = SPECIES_COLORS[name] || ['#22ee22','#0a6a0a','#0a3a0a','#aaffaa'];
+    return { name, head, body, patternColor, eye, tier };
 }
 
 // ══════════════════════════════════════════════════════
@@ -729,46 +770,75 @@ function getSpeciesData(lv) {
 // Prey type based on level / snake species
 // ── Species visual features (head shape, pattern, extras) ──────────────────
 function getSnakeFeatures(lv) {
-    const name = (getSpeciesData(lv).name || '');
-    const tier = (getSpeciesData(lv).tier || 0);
+    const sp   = getSpeciesData(lv);
+    const name = sp.name || '';
+    const tier = sp.tier || 0;
 
     // Head shape
     let headShape = 'rounded';
     if (['WATER MOCCASIN','COPPERHEAD','SIDEWINDER','TIMBER RATTLESNAKE',
          'WESTERN DIAMONDBACK','EASTERN DIAMONDBACK','FER-DE-LANCE',
          'BUSHMASTER','GABOON VIPER','SAW-SCALED VIPER','DEATH ADDER'].includes(name))
-        headShape = 'triangular';  // broad viper head
+        headShape = 'triangular';
     else if (['CAPE COBRA','EGYPTIAN COBRA','INDIAN COBRA','MONOCLED COBRA','KING COBRA'].includes(name))
-        headShape = 'hood';        // cobra with spread hood
+        headShape = 'hood';
     else if (['GREEN MAMBA','BLACK MAMBA','COACHWHIP','RACER SNAKE','VINE SNAKE',
               'FLYING SNAKE','INDIGO SNAKE'].includes(name))
-        headShape = 'elongated';   // narrow fast-snake head
+        headShape = 'elongated';
     else if (['BALL PYTHON','BURMESE PYTHON','AFRICAN ROCK PYTHON',
               'RETICULATED PYTHON','GREEN ANACONDA'].includes(name))
-        headShape = 'wide';        // wide python/anaconda head
+        headShape = 'wide';
 
-    // Body pattern overlay
-    let pattern = 'none';
-    if (['MILK SNAKE','CORN SNAKE','KING SNAKE','BANDED KRAIT','TIGER SNAKE',
-         'EASTERN BROWN SNAKE','COASTAL TAIPAN'].includes(name))
-        pattern = 'bands';
-    else if (['WESTERN DIAMONDBACK','EASTERN DIAMONDBACK','TIMBER RATTLESNAKE',
-              'GABOON VIPER','CARPET PYTHON'].includes(name))
-        pattern = 'diamonds';
-    else if (['RETICULATED PYTHON','BURMESE PYTHON','BALL PYTHON',
-              'GREEN ANACONDA','AFRICAN ROCK PYTHON'].includes(name))
+    // Body width — makes species visually distinct in thickness
+    let bodyWidth = CELL - 4; // default
+    if (headShape === 'triangular') bodyWidth = CELL - 1;  // thick viper
+    else if (headShape === 'wide')  bodyWidth = CELL - 1;  // thick python
+    else if (headShape === 'elongated') bodyWidth = CELL - 7; // slim mamba/racer
+    else if (name === 'VINE SNAKE' || name === 'FLYING SNAKE') bodyWidth = CELL - 8;
+
+    // Body pattern — each gives a DISTINCT bold visual
+    let pattern = 'solid';
+    // Zigzag chevron (classic viper/adder look — dark zigzag down spine on lighter body)
+    if (['WATER MOCCASIN','COPPERHEAD','SIDEWINDER','TIMBER RATTLESNAKE',
+         'WESTERN DIAMONDBACK','EASTERN DIAMONDBACK','FER-DE-LANCE',
+         'SAW-SCALED VIPER','DEATH ADDER'].includes(name))
+        pattern = 'zigzag';
+    // Large geometric blotches (Gaboon / Bushmaster — tan with dark purple-brown patches)
+    else if (['GABOON VIPER','BUSHMASTER'].includes(name))
+        pattern = 'blotch';
+    // Saddle blotches (pythons, bull/rat snake — dark transverse blotches)
+    else if (['RETICULATED PYTHON','BURMESE PYTHON','BALL PYTHON','AFRICAN ROCK PYTHON',
+              'GREEN ANACONDA','BULL SNAKE','RAT SNAKE','HOG-NOSED SNAKE',
+              'NIGHT SNAKE'].includes(name))
         pattern = 'saddle';
-    else if (['RING-NECKED SNAKE'].includes(name))
+    // Bold alternating color bands (milk/king/corn/mangrove/kraits/tiger)
+    else if (['MILK SNAKE','KING SNAKE','CORN SNAKE','MANGROVE SNAKE',
+              'BANDED KRAIT','TIGER SNAKE','COASTAL TAIPAN'].includes(name))
+        pattern = 'bands';
+    // Longitudinal stripes (garter, rainbow, coachwhip)
+    else if (['GARTER SNAKE','RAINBOW SNAKE','COACHWHIP'].includes(name))
+        pattern = 'stripes';
+    // Bright neck collar
+    else if (name === 'RING-NECKED SNAKE')
         pattern = 'ringneck';
+    // Reticulate net pattern (reticulated python)
+    else if (name === 'RETICULATED PYTHON')
+        pattern = 'reticulate';
+    // Common krait — stark white bands on black
+    else if (name === 'COMMON KRAIT')
+        pattern = 'bands';
+    // Indigo / flying snake — iridescent sheen dots
+    else if (['INDIGO SNAKE','FLYING SNAKE'].includes(name))
+        pattern = 'dots';
 
     // Slit pupils (venomous)
-    const slitPupil = tier >= 4;  // pit vipers, cobras, mambas, taipans, pythons
+    const slitPupil = tier >= 4;
 
     // Rattle at tail
     const hasRattle = ['SIDEWINDER','TIMBER RATTLESNAKE','WESTERN DIAMONDBACK',
                        'EASTERN DIAMONDBACK'].includes(name);
 
-    return { headShape, pattern, slitPupil, hasRattle };
+    return { headShape, bodyWidth, pattern, slitPupil, hasRattle };
 }
 
 function getPreyType(lv) {
@@ -1350,76 +1420,168 @@ function draw() {
 
     if (snake.length > 0) {
         const H  = CELL / 2;   // 7.5 — cell centre offset
-        // Body width varies by head shape: pythons/vipers thicker, mambas slimmer
-        const bw = sfx.headShape === 'triangular' ? CELL - 2 :
-                   sfx.headShape === 'wide'        ? CELL - 1 :
-                   sfx.headShape === 'elongated'   ? CELL - 6 : CELL - 4;
+        const bw = sfx.bodyWidth;
+
+        // Helper: draw snake path (skipping wall-wrap gaps)
+        function snakePath() {
+            snake.forEach((s, i) => {
+                const wrap = i > 0 && (Math.abs(s.x-snake[i-1].x)>1 || Math.abs(s.y-snake[i-1].y)>1);
+                wrap || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+            });
+        }
 
         // 1. Dark outline for depth
-        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-        ctx.lineWidth = bw + 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.lineWidth = bw + 4;
         ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-        ctx.beginPath();
-        snake.forEach((s, i) => {
-            const w = i > 0 && (Math.abs(s.x-snake[i-1].x)>1 || Math.abs(s.y-snake[i-1].y)>1);
-            w || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
-        });
-        ctx.stroke();
+        ctx.beginPath(); snakePath(); ctx.stroke();
 
-        // 2. Body fill
+        // 2. Body fill (species-accurate base color)
         ctx.strokeStyle = sp.body;
         ctx.lineWidth = bw;
-        ctx.beginPath();
-        snake.forEach((s, i) => {
-            const w = i > 0 && (Math.abs(s.x-snake[i-1].x)>1 || Math.abs(s.y-snake[i-1].y)>1);
-            w || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
-        });
-        ctx.stroke();
+        ctx.beginPath(); snakePath(); ctx.stroke();
 
-        // 3. Spine highlight stripe
+        // 3. Dorsal spine highlight (lighter stripe down center — gives 3D scale look)
         ctx.strokeStyle = sp.head;
-        ctx.lineWidth = Math.max(2, bw - 7);
-        ctx.beginPath();
-        snake.forEach((s, i) => {
-            const w = i > 0 && (Math.abs(s.x-snake[i-1].x)>1 || Math.abs(s.y-snake[i-1].y)>1);
-            w || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
-        });
-        ctx.stroke();
+        ctx.lineWidth = Math.max(2, bw - 6);
+        ctx.beginPath(); snakePath(); ctx.stroke();
 
-        // 4. Body pattern overlay (bands / diamonds / saddle / ringneck)
-        if (sfx.pattern === 'bands') {
-            // Alternating dark crossbands
-            for (let i = 2; i < snake.length - 1; i += 3) {
-                ctx.fillStyle = 'rgba(0,0,0,0.32)';
-                ctx.fillRect(snake[i].x*CELL+1, snake[i].y*CELL+1, CELL-2, CELL-2);
-                ctx.fillStyle = sp.eye + '88';
-                ctx.fillRect(snake[i].x*CELL+3, snake[i].y*CELL+3, CELL-6, CELL-6);
+        // 4. BOLD species-specific body patterns
+        const pc = sp.patternColor; // distinct pattern color per species
+
+        if (sfx.pattern === 'zigzag') {
+            // Classic viper/adder zigzag — dark chevrons alternating across body
+            // Gives the unmistakable adder look from photo 1
+            ctx.strokeStyle = pc;
+            ctx.lineWidth = 2.8;
+            ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+            for (let i = 1; i < snake.length - 1; i++) {
+                const s = snake[i];
+                const flip = i % 2 === 0 ? 1 : -1;
+                const cx = s.x*CELL+H, cy = s.y*CELL+H;
+                ctx.beginPath();
+                ctx.moveTo(cx - H + 1, cy - flip * 4);
+                ctx.lineTo(cx,         cy + flip * 4);
+                ctx.lineTo(cx + H - 1, cy - flip * 4);
+                ctx.stroke();
             }
-        } else if (sfx.pattern === 'diamonds') {
-            ctx.fillStyle = 'rgba(0,0,0,0.35)';
-            for (let i = 3; i < snake.length - 1; i += 4) {
-                const sx = snake[i].x*CELL+H, sy = snake[i].y*CELL+H;
-                ctx.save(); ctx.translate(sx, sy); ctx.rotate(Math.PI/4);
-                ctx.fillRect(-3, -3, 6, 6); ctx.restore();
+            // Dark center zigzag line over top for crispness
+            ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+            ctx.lineWidth = 1.2;
+            for (let i = 1; i < snake.length - 1; i++) {
+                const s = snake[i];
+                const flip = i % 2 === 0 ? 1 : -1;
+                const cx = s.x*CELL+H, cy = s.y*CELL+H;
+                ctx.beginPath();
+                ctx.moveTo(cx - H + 1, cy - flip * 4);
+                ctx.lineTo(cx,         cy + flip * 4);
+                ctx.lineTo(cx + H - 1, cy - flip * 4);
+                ctx.stroke();
             }
-        } else if (sfx.pattern === 'saddle') {
-            // Dark saddle blotches alternating with lighter base
-            for (let i = 2; i < snake.length - 1; i += 3) {
-                ctx.fillStyle = 'rgba(0,0,0,0.40)';
-                ctx.fillRect(snake[i].x*CELL+2, snake[i].y*CELL, CELL-4, CELL);
+
+        } else if (sfx.pattern === 'blotch') {
+            // Large irregular geometric blotches (Gaboon viper — photo 2)
+            // tan base, large dark purple-brown patches + lighter center
+            for (let i = 1; i < snake.length - 1; i++) {
+                const s = snake[i];
+                // Every segment: alternating wide/tall blotch
+                ctx.fillStyle = pc;
+                if (i % 2 === 0) {
+                    ctx.fillRect(s.x*CELL,     s.y*CELL+1,  CELL,    CELL-2);
+                } else {
+                    ctx.fillRect(s.x*CELL+1,   s.y*CELL,    CELL-2,  CELL);
+                }
+                // Lighter tan center highlight to create Gaboon "keyhole" effect
+                ctx.fillStyle = sp.head;
+                ctx.fillRect(s.x*CELL+3, s.y*CELL+3, CELL-6, CELL-6);
             }
+
+        } else if (sfx.pattern === 'bands') {
+            // Bold full-width color bands — milk snake, king snake, kraits
+            // Every 2nd/3rd segment is a vivid colored band
+            for (let i = 1; i < snake.length - 1; i++) {
+                const s = snake[i];
+                const phase = i % 3;
+                if (phase === 0) {
+                    // Bold pattern band — full cell width
+                    ctx.fillStyle = pc;
+                    ctx.fillRect(s.x*CELL, s.y*CELL, CELL, CELL);
+                } else if (phase === 1) {
+                    // Dark band
+                    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                    ctx.fillRect(s.x*CELL, s.y*CELL, CELL, CELL);
+                }
+                // phase 2 = base body color (no fill — shows through)
+            }
+
+        } else if (sfx.pattern === 'stripes') {
+            // Longitudinal stripes — garter snake (yellow stripes on olive body)
+            // Draw two bright stripes running along body sides
+            for (let i = 1; i < snake.length - 1; i++) {
+                const s = snake[i];
+                ctx.fillStyle = pc;
+                // Two parallel lateral stripes
+                ctx.fillRect(s.x*CELL+1,      s.y*CELL+1,      2, CELL-2);
+                ctx.fillRect(s.x*CELL+CELL-3, s.y*CELL+1,      2, CELL-2);
+                // Faint center dorsal stripe
+                ctx.fillStyle = pc + 'aa';
+                ctx.fillRect(s.x*CELL+H-1,    s.y*CELL+1,      2, CELL-2);
+            }
+
         } else if (sfx.pattern === 'ringneck') {
-            // Single bright ring near neck (second segment)
-            if (snake.length > 1) {
-                ctx.fillStyle = '#ffdd00';
-                ctx.fillRect(snake[1].x*CELL+2, snake[1].y*CELL+2, CELL-4, CELL-4);
+            // Bright bold collar at neck — 2 full segments wide, vivid orange
+            for (let i = 1; i <= Math.min(2, snake.length - 2); i++) {
+                const s = snake[i];
+                ctx.fillStyle = pc; // bright orange
+                ctx.fillRect(s.x*CELL, s.y*CELL, CELL, CELL);
+                // Dark outline on the ring
+                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(s.x*CELL+0.5, s.y*CELL+0.5, CELL-1, CELL-1);
             }
+
+        } else if (sfx.pattern === 'saddle') {
+            // Dark transverse saddle blotches — pythons, bull snake
+            for (let i = 2; i < snake.length - 1; i += 3) {
+                const s = snake[i];
+                ctx.fillStyle = pc;
+                ctx.fillRect(s.x*CELL,   s.y*CELL,   CELL, CELL);
+                // Lighter edge to make saddle stand out
+                ctx.fillStyle = sp.head + '66';
+                ctx.fillRect(s.x*CELL+2, s.y*CELL+2, CELL-4, CELL-4);
+            }
+
+        } else if (sfx.pattern === 'reticulate') {
+            // Net-like reticulate pattern (reticulated python)
+            ctx.strokeStyle = pc;
+            ctx.lineWidth = 1;
+            for (let i = 1; i < snake.length - 1; i++) {
+                const s = snake[i];
+                ctx.strokeRect(s.x*CELL+1, s.y*CELL+1, CELL-2, CELL-2);
+                if (i % 2 === 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(s.x*CELL+1, s.y*CELL+H);
+                    ctx.lineTo(s.x*CELL+CELL-1, s.y*CELL+H);
+                    ctx.stroke();
+                }
+            }
+
+        } else if (sfx.pattern === 'dots') {
+            // Iridescent spot dots (indigo snake / flying snake)
+            ctx.fillStyle = pc;
+            for (let i = 2; i < snake.length - 1; i += 2) {
+                const s = snake[i];
+                ctx.beginPath();
+                ctx.arc(s.x*CELL+H, s.y*CELL+H, 2.5, 0, Math.PI*2);
+                ctx.fill();
+            }
+
         } else {
-            // Default scale dots
-            ctx.fillStyle = 'rgba(0,0,0,0.22)';
+            // solid — scale texture dots only
+            ctx.fillStyle = 'rgba(0,0,0,0.20)';
             for (let i = 2; i < snake.length - 1; i += 2) {
                 ctx.beginPath();
-                ctx.arc(snake[i].x*CELL+H, snake[i].y*CELL+H, 1.8, 0, Math.PI*2);
+                ctx.arc(snake[i].x*CELL+H, snake[i].y*CELL+H, 1.5, 0, Math.PI*2);
                 ctx.fill();
             }
         }
@@ -1475,15 +1637,21 @@ function draw() {
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         if (sfx.headShape === 'triangular') {
-            // Broader angular viper head
-            ctx.roundRect(h.x*CELL, h.y*CELL+1, CELL, CELL-2, 2);
+            // Broad angular viper head — noticeably wider than body, sharp corners
+            // Extends 1px beyond cell on each side to emphasize width
+            const hx = h.x*CELL, hy = h.y*CELL;
+            if (dx === 1)       { ctx.moveTo(hx,    hy-1); ctx.lineTo(hx+CELL+2,hy+H);   ctx.lineTo(hx,    hy+CELL+1); }
+            else if (dx === -1) { ctx.moveTo(hx+CELL,hy-1); ctx.lineTo(hx-2,    hy+H);   ctx.lineTo(hx+CELL,hy+CELL+1); }
+            else if (dy === 1)  { ctx.moveTo(hx-1,  hy);   ctx.lineTo(hx+H,    hy+CELL+2); ctx.lineTo(hx+CELL+1,hy); }
+            else                { ctx.moveTo(hx-1,  hy+CELL); ctx.lineTo(hx+H, hy-2);    ctx.lineTo(hx+CELL+1,hy+CELL); }
+            ctx.closePath();
         } else if (sfx.headShape === 'elongated') {
             // Narrow elongated head (mamba / racer)
-            const nx = dx !== 0 ? 0 : 2, ny = dy !== 0 ? 0 : 2;
+            const nx = dx !== 0 ? 0 : 3, ny = dy !== 0 ? 0 : 3;
             ctx.roundRect(h.x*CELL+nx+1, h.y*CELL+ny+1, CELL-2-nx*2, CELL-2-ny*2, 1);
         } else if (sfx.headShape === 'wide') {
-            // Flat wide python head — full cell
-            ctx.roundRect(h.x*CELL, h.y*CELL, CELL, CELL, 4);
+            // Flat wide python head — full cell + slight overhang
+            ctx.roundRect(h.x*CELL-1, h.y*CELL-1, CELL+2, CELL+2, 3);
         } else {
             // Default rounded (harmless / mid-tier)
             ctx.roundRect(h.x*CELL+1, h.y*CELL+1, CELL-2, CELL-2, 3);
@@ -1531,14 +1699,17 @@ function draw() {
     }
     ctx.globalAlpha = 1.0;
 
-    // Species name (bottom-right, level 2+)
+    // Species name — bold banner at bottom of play area (centered, always legible)
     if (sp.name) {
-        ctx.font = '7px "Courier New"';
-        ctx.textAlign = 'right';
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillText(sp.name, 299, 298);
+        const bannerY = ROWS * CELL - 1; // bottom of canvas
+        // Shadow
+        ctx.font = 'bold 9px "Courier New"';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillText(sp.name, COLS * CELL / 2 + 1, bannerY - 5 + 1);
+        // Text in species eye color (bright & distinct per species)
         ctx.fillStyle = sp.eye;
-        ctx.fillText(sp.name, 298, 297);
+        ctx.fillText(sp.name, COLS * CELL / 2, bannerY - 5);
         ctx.textAlign = 'center';
     }
 
