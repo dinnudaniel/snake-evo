@@ -504,10 +504,11 @@ canvas{
     <!-- SCREEN -->
     <div class="screen">
 
-        <div class="title">SNAKE EVO</div>
+        <div class="title">SNAKE EVO &nbsp;<span id="levelBadge" style="font-size:11px;font-weight:normal;opacity:0.85">LV <span id="levelNum">1</span></span></div>
 
         <div class="info">
-            <span>HIGH SCORE <span id="highscore">0</span></span>
+            <span>SCORE <span id="highscore">0</span></span>
+            <span>BEST <span id="bestScore">0</span></span>
             <span>COIN <span id="coins">0</span></span>
         </div>
 
@@ -716,9 +717,9 @@ const SPECIES_TIERS = [
 function getSpeciesData(lv) {
     if (!lv || lv < 2) return { name:null, head:'#1e6a1e', body:'#0f380f', eye:'#9bbc0f' };
     let idx = Math.min(Math.floor((lv - 2) / 2), SPECIES.length - 1);
-    let tier = Math.min(idx, 9);
+    let tier = Math.min(Math.floor(idx / 5), 9);  // 5 species per tier, 10 tiers
     let [head, body, eye] = SPECIES_TIERS[tier];
-    return { name: SPECIES[idx], head, body, eye };
+    return { name: SPECIES[idx], head, body, eye, tier };
 }
 
 // ══════════════════════════════════════════════════════
@@ -726,6 +727,50 @@ function getSpeciesData(lv) {
 // ══════════════════════════════════════════════════════
 
 // Prey type based on level / snake species
+// ── Species visual features (head shape, pattern, extras) ──────────────────
+function getSnakeFeatures(lv) {
+    const name = (getSpeciesData(lv).name || '');
+    const tier = (getSpeciesData(lv).tier || 0);
+
+    // Head shape
+    let headShape = 'rounded';
+    if (['WATER MOCCASIN','COPPERHEAD','SIDEWINDER','TIMBER RATTLESNAKE',
+         'WESTERN DIAMONDBACK','EASTERN DIAMONDBACK','FER-DE-LANCE',
+         'BUSHMASTER','GABOON VIPER','SAW-SCALED VIPER','DEATH ADDER'].includes(name))
+        headShape = 'triangular';  // broad viper head
+    else if (['CAPE COBRA','EGYPTIAN COBRA','INDIAN COBRA','MONOCLED COBRA','KING COBRA'].includes(name))
+        headShape = 'hood';        // cobra with spread hood
+    else if (['GREEN MAMBA','BLACK MAMBA','COACHWHIP','RACER SNAKE','VINE SNAKE',
+              'FLYING SNAKE','INDIGO SNAKE'].includes(name))
+        headShape = 'elongated';   // narrow fast-snake head
+    else if (['BALL PYTHON','BURMESE PYTHON','AFRICAN ROCK PYTHON',
+              'RETICULATED PYTHON','GREEN ANACONDA'].includes(name))
+        headShape = 'wide';        // wide python/anaconda head
+
+    // Body pattern overlay
+    let pattern = 'none';
+    if (['MILK SNAKE','CORN SNAKE','KING SNAKE','BANDED KRAIT','TIGER SNAKE',
+         'EASTERN BROWN SNAKE','COASTAL TAIPAN'].includes(name))
+        pattern = 'bands';
+    else if (['WESTERN DIAMONDBACK','EASTERN DIAMONDBACK','TIMBER RATTLESNAKE',
+              'GABOON VIPER','CARPET PYTHON'].includes(name))
+        pattern = 'diamonds';
+    else if (['RETICULATED PYTHON','BURMESE PYTHON','BALL PYTHON',
+              'GREEN ANACONDA','AFRICAN ROCK PYTHON'].includes(name))
+        pattern = 'saddle';
+    else if (['RING-NECKED SNAKE'].includes(name))
+        pattern = 'ringneck';
+
+    // Slit pupils (venomous)
+    const slitPupil = tier >= 4;  // pit vipers, cobras, mambas, taipans, pythons
+
+    // Rattle at tail
+    const hasRattle = ['SIDEWINDER','TIMBER RATTLESNAKE','WESTERN DIAMONDBACK',
+                       'EASTERN DIAMONDBACK'].includes(name);
+
+    return { headShape, pattern, slitPupil, hasRattle };
+}
+
 function getPreyType(lv) {
     if (lv <= 1) return 'egg';
     const name = (getSpeciesData(lv).name || '');
@@ -774,7 +819,7 @@ const PREY_TIER_COLORS = [
 function getPreyColors(lv) {
     if (!lv || lv < 2) return PREY_TIER_COLORS[0];
     let idx = Math.min(Math.floor((lv - 2) / 2), SPECIES.length - 1);
-    let tier = Math.min(idx, 9);
+    let tier = Math.min(Math.floor(idx / 5), 9);
     return PREY_TIER_COLORS[tier];
 }
 
@@ -1102,6 +1147,11 @@ function updateUI() {
     document.getElementById('prey').innerText      = preyEaten;
     document.getElementById('coins').innerText     = coins;
     document.getElementById('highscore').innerText = score || 0;
+    document.getElementById('levelNum').innerText  = level || 1;
+    // Real best — updates live as score climbs above previous best
+    const prevBest = getHighScore();
+    if (score > prevBest) saveHighScore(score);
+    document.getElementById('bestScore').innerText = Math.max(prevBest, score) || 0;
 }
 
 // ══════════════════════════════════════════════════════
@@ -1293,23 +1343,26 @@ function draw() {
     // Prey — type-aware rendering
     drawPrey();
 
-    // Snake — real graphical rendering
-    const sp = getSpeciesData(level);
+    // Snake — species-accurate graphical rendering
+    const sp  = getSpeciesData(level);
+    const sfx = getSnakeFeatures(level);
     ctx.globalAlpha = ghostActive ? 0.38 : 1.0;
 
     if (snake.length > 0) {
-        const H = CELL / 2;      // center offset = 7.5
-        const bw = CELL - 4;     // body tube width = 11
+        const H  = CELL / 2;   // 7.5 — cell centre offset
+        // Body width varies by head shape: pythons/vipers thicker, mambas slimmer
+        const bw = sfx.headShape === 'triangular' ? CELL - 2 :
+                   sfx.headShape === 'wide'        ? CELL - 1 :
+                   sfx.headShape === 'elongated'   ? CELL - 6 : CELL - 4;
 
         // 1. Dark outline for depth
         ctx.strokeStyle = 'rgba(0,0,0,0.45)';
         ctx.lineWidth = bw + 3;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
         ctx.beginPath();
         snake.forEach((s, i) => {
-            const wrapped = i > 0 && (Math.abs(s.x-snake[i-1].x) > 1 || Math.abs(s.y-snake[i-1].y) > 1);
-            (i === 0 || wrapped) ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+            const w = i > 0 && (Math.abs(s.x-snake[i-1].x)>1 || Math.abs(s.y-snake[i-1].y)>1);
+            w || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
         });
         ctx.stroke();
 
@@ -1318,81 +1371,159 @@ function draw() {
         ctx.lineWidth = bw;
         ctx.beginPath();
         snake.forEach((s, i) => {
-            const wrapped = i > 0 && (Math.abs(s.x-snake[i-1].x) > 1 || Math.abs(s.y-snake[i-1].y) > 1);
-            (i === 0 || wrapped) ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+            const w = i > 0 && (Math.abs(s.x-snake[i-1].x)>1 || Math.abs(s.y-snake[i-1].y)>1);
+            w || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
         });
         ctx.stroke();
 
-        // 3. Spine highlight stripe (lighter centre line)
+        // 3. Spine highlight stripe
         ctx.strokeStyle = sp.head;
         ctx.lineWidth = Math.max(2, bw - 7);
         ctx.beginPath();
         snake.forEach((s, i) => {
-            const wrapped = i > 0 && (Math.abs(s.x-snake[i-1].x) > 1 || Math.abs(s.y-snake[i-1].y) > 1);
-            (i === 0 || wrapped) ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
+            const w = i > 0 && (Math.abs(s.x-snake[i-1].x)>1 || Math.abs(s.y-snake[i-1].y)>1);
+            w || i===0 ? ctx.moveTo(s.x*CELL+H, s.y*CELL+H) : ctx.lineTo(s.x*CELL+H, s.y*CELL+H);
         });
         ctx.stroke();
 
-        // 4. Scale dot texture every other body segment
-        ctx.fillStyle = 'rgba(0,0,0,0.22)';
-        for (let i = 2; i < snake.length - 1; i += 2) {
-            ctx.beginPath();
-            ctx.arc(snake[i].x*CELL+H, snake[i].y*CELL+H, 1.8, 0, Math.PI*2);
-            ctx.fill();
+        // 4. Body pattern overlay (bands / diamonds / saddle / ringneck)
+        if (sfx.pattern === 'bands') {
+            // Alternating dark crossbands
+            for (let i = 2; i < snake.length - 1; i += 3) {
+                ctx.fillStyle = 'rgba(0,0,0,0.32)';
+                ctx.fillRect(snake[i].x*CELL+1, snake[i].y*CELL+1, CELL-2, CELL-2);
+                ctx.fillStyle = sp.eye + '88';
+                ctx.fillRect(snake[i].x*CELL+3, snake[i].y*CELL+3, CELL-6, CELL-6);
+            }
+        } else if (sfx.pattern === 'diamonds') {
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            for (let i = 3; i < snake.length - 1; i += 4) {
+                const sx = snake[i].x*CELL+H, sy = snake[i].y*CELL+H;
+                ctx.save(); ctx.translate(sx, sy); ctx.rotate(Math.PI/4);
+                ctx.fillRect(-3, -3, 6, 6); ctx.restore();
+            }
+        } else if (sfx.pattern === 'saddle') {
+            // Dark saddle blotches alternating with lighter base
+            for (let i = 2; i < snake.length - 1; i += 3) {
+                ctx.fillStyle = 'rgba(0,0,0,0.40)';
+                ctx.fillRect(snake[i].x*CELL+2, snake[i].y*CELL, CELL-4, CELL);
+            }
+        } else if (sfx.pattern === 'ringneck') {
+            // Single bright ring near neck (second segment)
+            if (snake.length > 1) {
+                ctx.fillStyle = '#ffdd00';
+                ctx.fillRect(snake[1].x*CELL+2, snake[1].y*CELL+2, CELL-4, CELL-4);
+            }
+        } else {
+            // Default scale dots
+            ctx.fillStyle = 'rgba(0,0,0,0.22)';
+            for (let i = 2; i < snake.length - 1; i += 2) {
+                ctx.beginPath();
+                ctx.arc(snake[i].x*CELL+H, snake[i].y*CELL+H, 1.8, 0, Math.PI*2);
+                ctx.fill();
+            }
         }
 
-        // 5. Head — distinct filled rectangle on top
+        // 4b. Rattle at tail (rattlesnake species)
+        if (sfx.hasRattle && snake.length > 1) {
+            const t = snake[snake.length - 1];
+            ctx.fillStyle = '#d4a843';
+            for (let r = 0; r < 3; r++) {
+                ctx.beginPath();
+                ctx.ellipse(t.x*CELL+H, t.y*CELL+H, 2.5-r*0.4, 2-r*0.3, 0, 0, Math.PI*2);
+                ctx.fill();
+            }
+            ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.5;
+            ctx.beginPath(); ctx.ellipse(t.x*CELL+H, t.y*CELL+H, 2.5, 2, 0, 0, Math.PI*2); ctx.stroke();
+        }
+
         const h = snake[0];
+
+        // 5a. Cobra hood — fan behind head perpendicular to movement
+        if (sfx.headShape === 'hood') {
+            ctx.fillStyle = sp.head;
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.8;
+            const hoodRx = dx !== 0 ? 3 : 8;
+            const hoodRy = dy !== 0 ? 3 : 8;
+            ctx.save();
+            ctx.translate(h.x*CELL+H, h.y*CELL+H);
+            ctx.beginPath(); ctx.ellipse(0, 0, hoodRx, hoodRy, 0, 0, Math.PI*2);
+            ctx.fill(); ctx.stroke();
+            // Hood ribs
+            ctx.strokeStyle = sp.body; ctx.lineWidth = 0.6;
+            const ribCount = 4;
+            for (let r = 1; r <= ribCount; r++) {
+                const t2 = (r / (ribCount + 1)) * Math.PI;
+                if (dx !== 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -hoodRy * Math.sin(t2));
+                    ctx.lineTo(0,  hoodRy * Math.sin(t2));
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(-hoodRx * Math.sin(t2), 0);
+                    ctx.lineTo( hoodRx * Math.sin(t2), 0);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+
+        // 5b. Head shape
         ctx.fillStyle = sp.head;
         ctx.strokeStyle = 'rgba(0,0,0,0.55)';
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.roundRect(h.x*CELL+1, h.y*CELL+1, CELL-2, CELL-2, 3);
-        ctx.fill();
-        ctx.stroke();
+        if (sfx.headShape === 'triangular') {
+            // Broader angular viper head
+            ctx.roundRect(h.x*CELL, h.y*CELL+1, CELL, CELL-2, 2);
+        } else if (sfx.headShape === 'elongated') {
+            // Narrow elongated head (mamba / racer)
+            const nx = dx !== 0 ? 0 : 2, ny = dy !== 0 ? 0 : 2;
+            ctx.roundRect(h.x*CELL+nx+1, h.y*CELL+ny+1, CELL-2-nx*2, CELL-2-ny*2, 1);
+        } else if (sfx.headShape === 'wide') {
+            // Flat wide python head — full cell
+            ctx.roundRect(h.x*CELL, h.y*CELL, CELL, CELL, 4);
+        } else {
+            // Default rounded (harmless / mid-tier)
+            ctx.roundRect(h.x*CELL+1, h.y*CELL+1, CELL-2, CELL-2, 3);
+        }
+        ctx.fill(); ctx.stroke();
 
         // 6. Eyes — direction-aware
         const eyeCol = ghostActive ? '#ccff44' : sp.eye;
         let e1x, e1y, e2x, e2y;
-        if (dx === 1) {
-            e1x = h.x*CELL+11; e1y = h.y*CELL+4;
-            e2x = h.x*CELL+11; e2y = h.y*CELL+11;
-        } else if (dx === -1) {
-            e1x = h.x*CELL+4;  e1y = h.y*CELL+4;
-            e2x = h.x*CELL+4;  e2y = h.y*CELL+11;
-        } else if (dy === 1) {
-            e1x = h.x*CELL+4;  e1y = h.y*CELL+11;
-            e2x = h.x*CELL+11; e2y = h.y*CELL+11;
-        } else {
-            e1x = h.x*CELL+4;  e1y = h.y*CELL+4;
-            e2x = h.x*CELL+11; e2y = h.y*CELL+4;
-        }
+        if (dx === 1)       { e1x=h.x*CELL+11; e1y=h.y*CELL+4;  e2x=h.x*CELL+11; e2y=h.y*CELL+11; }
+        else if (dx === -1) { e1x=h.x*CELL+4;  e1y=h.y*CELL+4;  e2x=h.x*CELL+4;  e2y=h.y*CELL+11; }
+        else if (dy === 1)  { e1x=h.x*CELL+4;  e1y=h.y*CELL+11; e2x=h.x*CELL+11; e2y=h.y*CELL+11; }
+        else                { e1x=h.x*CELL+4;  e1y=h.y*CELL+4;  e2x=h.x*CELL+11; e2y=h.y*CELL+4;  }
         ctx.fillStyle = eyeCol;
         ctx.beginPath(); ctx.arc(e1x, e1y, 2.2, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(e2x, e2y, 2.2, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#111';
-        ctx.beginPath(); ctx.arc(e1x, e1y, 1.1, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(e2x, e2y, 1.1, 0, Math.PI*2); ctx.fill();
+        if (sfx.slitPupil) {
+            // Vertical slit pupil for venomous snakes
+            ctx.fillStyle = '#111';
+            const pw = dx !== 0 ? 0.5 : 1.3, ph = dy !== 0 ? 0.5 : 1.3;
+            ctx.beginPath(); ctx.ellipse(e1x, e1y, pw, ph, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(e2x, e2y, pw, ph, 0, 0, Math.PI*2); ctx.fill();
+        } else {
+            ctx.fillStyle = '#111';
+            ctx.beginPath(); ctx.arc(e1x, e1y, 1.1, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(e2x, e2y, 1.1, 0, Math.PI*2); ctx.fill();
+        }
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
         ctx.beginPath(); ctx.arc(e1x-0.5, e1y-0.5, 0.6, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(e2x-0.5, e2y-0.5, 0.6, 0, Math.PI*2); ctx.fill();
 
         // 7. Tongue — forked, flicking animation
         if (Date.now() % 700 < 350) {
-            ctx.strokeStyle = '#cc1111';
-            ctx.lineWidth = 1;
-            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#cc1111'; ctx.lineWidth = 1; ctx.lineCap = 'round';
             const tx = h.x*CELL+H, ty = h.y*CELL+H;
             let bx, by, f1x, f1y, f2x, f2y;
-            if (dx === 1) {
-                bx=tx+9; by=ty; f1x=bx+4; f1y=by-2; f2x=bx+4; f2y=by+2;
-            } else if (dx === -1) {
-                bx=tx-9; by=ty; f1x=bx-4; f1y=by-2; f2x=bx-4; f2y=by+2;
-            } else if (dy === 1) {
-                bx=tx; by=ty+9; f1x=bx-2; f1y=by+4; f2x=bx+2; f2y=by+4;
-            } else {
-                bx=tx; by=ty-9; f1x=bx-2; f1y=by-4; f2x=bx+2; f2y=by-4;
-            }
+            if      (dx === 1)  { bx=tx+9; by=ty;   f1x=bx+4; f1y=by-2; f2x=bx+4; f2y=by+2; }
+            else if (dx === -1) { bx=tx-9; by=ty;   f1x=bx-4; f1y=by-2; f2x=bx-4; f2y=by+2; }
+            else if (dy === 1)  { bx=tx;   by=ty+9; f1x=bx-2; f1y=by+4; f2x=bx+2; f2y=by+4; }
+            else                { bx=tx;   by=ty-9; f1x=bx-2; f1y=by-4; f2x=bx+2; f2y=by-4; }
             ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(bx,by); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(f1x,f1y); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(f2x,f2y); ctx.stroke();
@@ -1776,7 +1907,8 @@ function setDir(dir) {
 // BOOST
 // ══════════════════════════════════════════════════════
 function boost() {
-    if (gState !== 'playing') return;
+    // When not playing, center button = OK / START
+    if (gState !== 'playing') { startGame(); return; }
     let prev = speed; speed = 50;
     setTimeout(() => { speed = prev; }, 1000);
 }
